@@ -37,3 +37,7 @@ and stays red until `mirafive/sdk-php` 1.0 is published on Packagist.
 - Tests never touch the network: bind `tests/Support/FakeTransport` as `MiraFive\Http\Transport` (`TestCase` does).
 - Comments only for non-obvious constraints, one or two lines.
 - Do not run git write commands; the maintainer commits.
+
+## Releasing
+
+To release, add a `## X.Y.Z — YYYY-MM-DD` section to `CHANGELOG.md`, commit, then `git tag vX.Y.Z && git push origin vX.Y.Z`. `.github/workflows/release.yml` checks the changelog, runs `composer check` and creates the GitHub release; Packagist picks the tag up by itself.
