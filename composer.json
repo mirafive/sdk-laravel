@@ -1,0 +1,67 @@
+{
+    "name": "mirafive/sdk-laravel",
+    "description": "Laravel integration of MIRA FIVE, privacy-first EU analytics: server-side events, feature flags and the tracker tag.",
+    "type": "library",
+    "license": "MIT",
+    "keywords": ["analytics", "privacy", "gdpr", "feature-flags", "experiments", "laravel", "mirafive"],
+    "homepage": "https://mirafive.io",
+    "authors": [
+        {
+            "name": "Cloo GmbH",
+            "homepage": "https://mirafive.io"
+        }
+    ],
+    "require": {
+        "php": "^8.3",
+        "illuminate/console": "^11.0|^12.0|^13.0",
+        "illuminate/contracts": "^11.0|^12.0|^13.0",
+        "illuminate/http": "^11.0|^12.0|^13.0",
+        "illuminate/support": "^11.0|^12.0|^13.0",
+        "illuminate/view": "^11.0|^12.0|^13.0",
+        "mirafive/sdk-php": "^0.5"
+    },
+    "require-dev": {
+        "larastan/larastan": "^3.12",
+        "laravel/pint": "^1.24",
+        "orchestra/testbench": "^9.18|^10.12|^11.3",
+        "pestphp/pest": "^4.0"
+    },
+    "autoload": {
+        "psr-4": {
+            "MiraFive\\Laravel\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "MiraFive\\Laravel\\Tests\\": "tests/"
+        }
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "MiraFive\\Laravel\\MiraFiveServiceProvider"
+            ],
+            "aliases": {
+                "Mira": "MiraFive\\Laravel\\Facades\\Mira"
+            }
+        }
+    },
+    "scripts": {
+        "lint": "pint",
+        "analyse": "phpstan analyse --memory-limit=1G",
+        "test": "pest",
+        "check": [
+            "pint --test",
+            "phpstan analyse --memory-limit=1G --no-progress",
+            "pest"
+        ]
+    },
+    "config": {
+        "sort-packages": true,
+        "allow-plugins": {
+            "pestphp/pest-plugin": true
+        }
+    },
+    "minimum-stability": "stable",
+    "prefer-stable": true
+}
