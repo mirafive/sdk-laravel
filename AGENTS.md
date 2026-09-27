@@ -6,12 +6,12 @@ protocol repository; change it there first.
 
 ## Local development
 
-`mirafive/sdk-php` is not on Packagist yet. `composer.json` keeps requiring `mirafive/sdk-php: ^0.5`; for local work
+`mirafive/sdk-php` is not on Packagist yet. `composer.json` keeps requiring `mirafive/sdk-php: ^1.0`; for local work
 use the gitignored `composer.local.json`, a copy of `composer.json` that adds a path repository to the sibling checkout:
 
 ```json
 "repositories": [
-    {"type": "path", "url": "../sdk-php", "options": {"symlink": true, "versions": {"mirafive/sdk-php": "0.5.0"}}}
+    {"type": "path", "url": "../sdk-php", "options": {"symlink": true, "versions": {"mirafive/sdk-php": "1.0.0"}}}
 ]
 ```
 
@@ -23,7 +23,7 @@ vendor/bin/pest                                # tests only
 ```
 
 Keep `composer.local.json` in step with `composer.json` when dependencies change. CI installs from `composer.json`
-and stays red until `mirafive/sdk-php` 0.5 is published on Packagist.
+and stays red until `mirafive/sdk-php` 1.0 is published on Packagist.
 
 ## Rules
 

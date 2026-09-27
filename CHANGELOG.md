@@ -1,8 +1,8 @@
 # Changelog
 
-## 0.5.0 — 2026-09-27
+## 1.0.0 — 2026-09-27
 
-First release, on `mirafive/sdk-php` 0.5 (hand-off, `deliverPrepared`, `enabled` and `flushOnShutdown`).
+First release, on `mirafive/sdk-php` 1.0 (hand-off, `deliverPrepared`, `enabled` and `flushOnShutdown`).
 
 - Auto-discovered `MiraFiveServiceProvider` and `Mira` facade; `config/mirafive.php` (publish tag `mirafive-config`).
 - `MiraFive\Mira` and `MiraFive\Flags\MiraFlags` from the container, flushed when the application terminates, after

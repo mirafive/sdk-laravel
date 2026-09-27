@@ -19,7 +19,7 @@
         "illuminate/queue": "^11.0|^12.0|^13.0",
         "illuminate/support": "^11.0|^12.0|^13.0",
         "illuminate/view": "^11.0|^12.0|^13.0",
-        "mirafive/sdk-php": "^0.5"
+        "mirafive/sdk-php": "^1.0"
     },
     "require-dev": {
         "larastan/larastan": "^3.12",
