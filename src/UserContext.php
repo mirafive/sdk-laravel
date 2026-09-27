@@ -41,9 +41,12 @@ final readonly class UserContext
     /**
      * @param  array<string, mixed>  $properties
      * @param  array{experiments?: bool, targeting?: bool}  $consent
+     * @param  bool|null  $optedOut  null reads `Sec-GPC`/`DNT` from the current request
      */
-    public function flags(array $properties = [], array $consent = [], ?string $anonymousId = null, bool $optedOut = false): UserFlags
+    public function flags(array $properties = [], array $consent = [], ?string $anonymousId = null, ?bool $optedOut = null): UserFlags
     {
+        $optedOut ??= $this->client->currentRequestOptedOut();
+
         return $this->client->flags()->for($this->userId, $anonymousId, $properties, $consent, $optedOut);
     }
 }

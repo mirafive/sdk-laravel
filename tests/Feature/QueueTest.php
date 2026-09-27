@@ -89,3 +89,27 @@ it('runs inline on the sync connection', function (): void {
 
     expect($this->transport->batches())->toHaveCount(1);
 });
+
+it('drops queued batches quietly on a worker that is switched off', function (): void {
+    config()->set('mirafive.enabled', false);
+    Log::spy();
+    $job = (new SendBatch(json_encode(['v' => 1, 'batch' => '0192d4a8-7b1c-4e8a-9c1d-2b3e4f5a6b7c', 'mode' => 'full', 'events' => [['name' => 'signup']]])))->withFakeQueueInteractions();
+
+    app()->call([$job, 'handle']);
+
+    $job->assertNotFailed();
+    expect($this->transport->requests)->toBeEmpty();
+    Log::shouldNotHaveReceived('error');
+});
+
+it('fails the job without retrying on a worker without a secret key', function (): void {
+    config()->set('mirafive.secret_key', null);
+    Log::spy();
+    $job = (new SendBatch(json_encode(['v' => 1, 'batch' => '0192d4a8-7b1c-4e8a-9c1d-2b3e4f5a6b7c', 'mode' => 'full', 'events' => [['name' => 'signup']]])))->withFakeQueueInteractions();
+
+    app()->call([$job, 'handle']);
+
+    $job->assertFailed();
+    expect($this->transport->requests)->toBeEmpty();
+    Log::shouldHaveReceived('error')->once();
+});

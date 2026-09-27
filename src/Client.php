@@ -6,6 +6,7 @@ namespace MiraFive\Laravel;
 
 use Closure;
 use DateTimeInterface;
+use Illuminate\Container\Container;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Http\Request;
 use InvalidArgumentException;
@@ -89,5 +90,13 @@ class Client
     public function optedOut(Request $request): bool
     {
         return $request->headers->get('Sec-GPC') === '1' || $request->headers->get('DNT') === '1';
+    }
+
+    /** optedOut() for the request being handled; false outside one. Resolved per call, as this client outlives requests. */
+    public function currentRequestOptedOut(): bool
+    {
+        $app = Container::getInstance();
+
+        return $app->bound('request') && $this->optedOut($app->make(Request::class));
     }
 }

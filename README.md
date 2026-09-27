@@ -126,7 +126,9 @@ shutdown flush is switched off. Every 100 events it is sent early. `send()` is a
 `MiraFive\Laravel\Queue\SendBatch` job, so the request does not wait for MIRA FIVE at all. The job carries the body,
 never the key: the worker sends it with its own configuration. The body is final and keeps its batch id, so a job
 that runs twice is stored once. Retryable failures are retried by the queue (5 tries, backoff up to 15 minutes);
-refused batches are logged and dropped. Batches are up to 1 MiB of JSON (SQS allows 256 KB). `send()` never queues:
+refused batches are logged and dropped. A worker without
+`MIRAFIVE_SECRET_KEY` logs an error and fails the job instead of dropping it; one with `MIRAFIVE_ENABLED=false` drops it
+quietly. Batches are up to 1 MiB of JSON (SQS allows 256 KB). `send()` never queues:
 it always sends immediately and returns the collector's receipt.
 
 **Octane.** The package is safe in long-running workers: no request state is kept in singletons, and the buffer is
@@ -148,7 +150,8 @@ $flags->variant('pricing-test');           // ?string
 $flags->config('limits', ['max' => 3]);    // the variant's value
 ```
 
-Or `Mira::forUser($request->user())->flags(properties: [...])`. Reads never throw; without a document every flag
+Or `Mira::forUser($request->user())->flags(properties: [...])`, which reads the opt-out from the current request
+unless you pass `optedOut`. Reads never throw; without a document every flag
 answers its fallback. The document is fetched on first use and shared between requests through the cache store.
 
 **Bootstrap in Blade.** Hand the server's answers to the browser SDK so the first paint shows the right variant:

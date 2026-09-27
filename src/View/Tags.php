@@ -84,7 +84,7 @@ final class Tags
         $anonymousId = $unit['anonymousId'] ?? null;
         $properties = $unit['properties'] ?? [];
         $consent = $unit['consent'] ?? [];
-        $optedOut = $unit['optedOut'] ?? $this->requestOptedOut();
+        $optedOut = $unit['optedOut'] ?? $this->app->make(Client::class)->currentRequestOptedOut();
 
         if ((! is_string($userId) && ! is_int($userId) && $userId !== null) || (! is_string($anonymousId) && $anonymousId !== null)
             || ! is_array($properties) || ! is_array($consent) || ! is_bool($optedOut)) {
@@ -100,11 +100,6 @@ final class Tags
             $consent,
             $optedOut,
         );
-    }
-
-    private function requestOptedOut(): bool
-    {
-        return $this->app->bound('request') && $this->app->make(Client::class)->optedOut($this->app->make(Request::class));
     }
 
     private function viteNonce(): ?string

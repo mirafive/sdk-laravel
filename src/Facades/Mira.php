@@ -18,6 +18,7 @@ use MiraFive\Mode;
  * @method static \MiraFive\Flags\MiraFlags flags()
  * @method static \MiraFive\Laravel\UserContext forUser(\Illuminate\Contracts\Auth\Authenticatable $user)
  * @method static bool optedOut(\Illuminate\Http\Request $request)
+ * @method static bool currentRequestOptedOut()
  *
  * @see Client
  */
