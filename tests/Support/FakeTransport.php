@@ -24,7 +24,7 @@ final class FakeTransport implements Transport
         return $this;
     }
 
-    public function request(string $method, string $url, array $headers, ?string $body, int $timeoutMs): Response
+    public function request(string $method, string $url, array $headers, ?string $body, int $timeoutMs, int $connectTimeoutMs = 1_000): Response
     {
         $this->requests[] = compact('method', 'url', 'headers', 'body');
         $answer = array_shift($this->answers);
