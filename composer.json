@@ -1,6 +1,6 @@
 {
     "name": "mirafive/sdk-laravel",
-    "description": "Laravel integration of MIRA FIVE, privacy-first EU analytics: server-side events, feature flags and the tracker tag.",
+    "description": "MIRA FIVE SDK for Laravel",
     "type": "library",
     "license": "MIT",
     "keywords": ["analytics", "privacy", "gdpr", "feature-flags", "experiments", "laravel", "mirafive"],
