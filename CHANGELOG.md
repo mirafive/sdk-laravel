@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- **Breaking:** feature flags and A/B experiments are removed: `Mira::flags()`, `UserContext::flags()`, the `MiraFlags` container binding, the `@mirafiveFlags` Blade directive, the `SendBootstrapHeaders` middleware, `Mira::currentRequestOptedOut()` and the `flags.refresh_seconds` and `flags.cache_store` config keys (`MIRAFIVE_FLAGS_REFRESH`, `MIRAFIVE_FLAGS_CACHE`). The delivery pause of the core client now uses the default cache store.
+
 ## 1.0.0 — 2026-09-27
 
 First release, on `mirafive/sdk-php` 1.0 (hand-off, `deliverPrepared`, `enabled` and `flushOnShutdown`).

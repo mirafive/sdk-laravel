@@ -13,7 +13,7 @@ use PHPUnit\Framework\Assert;
 
 /**
  * Records calls instead of sending them. Input is still checked by the core, so an event the collector would refuse
- * fails the test as it would fail in production. Flags answer their fallbacks.
+ * fails the test as it would fail in production.
  *
  * @phpstan-type TrackedEvent array{name: string, userId: string|null, anonymousId: string|null, sessionId: string|null, properties: array<array-key, mixed>, time: DateTimeInterface|int|null, page: array<array-key, mixed>|null}
  * @phpstan-type Identified array{userId: string, traits: array<string, mixed>, anonymousId: string|null}
@@ -30,7 +30,7 @@ class MiraFake extends Client
     {
         $mira = new Mira(key: '', host: Mira::DEFAULT_HOST, mode: $mode, enabled: false, flushOnShutdown: false);
 
-        parent::__construct($mira, $mira->flags(...));
+        parent::__construct($mira);
     }
 
     public function track(

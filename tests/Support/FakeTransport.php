@@ -8,7 +8,7 @@ use MiraFive\Http\Response;
 use MiraFive\Http\Transport;
 use Throwable;
 
-/** Answers queued responses in order; without one, a batch is accepted and a flag fetch finds nothing new. */
+/** Answers queued responses in order; without one, a batch is accepted. */
 final class FakeTransport implements Transport
 {
     /** @var list<Response|Throwable> */

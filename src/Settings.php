@@ -25,8 +25,6 @@ final readonly class Settings
         public ?string $queueConnection = null,
         public ?string $queue = null,
         public string $scriptUrl = self::DEFAULT_SCRIPT_URL,
-        public int $refreshSeconds = 30,
-        public ?string $cacheStore = null,
     ) {}
 
     /**
@@ -34,7 +32,6 @@ final readonly class Settings
      */
     public static function fromConfig(array $config): self
     {
-        $flags = is_array($config['flags'] ?? null) ? $config['flags'] : [];
         [$connection, $queue] = self::queue($config['queue'] ?? null);
 
         return new self(
@@ -47,12 +44,10 @@ final readonly class Settings
             queueConnection: $connection,
             queue: $queue,
             scriptUrl: self::string($config['script_url'] ?? null) ?? self::DEFAULT_SCRIPT_URL,
-            refreshSeconds: is_numeric($flags['refresh_seconds'] ?? null) ? (int) $flags['refresh_seconds'] : 30,
-            cacheStore: self::string($flags['cache_store'] ?? null),
         );
     }
 
-    /** Whether server events and flags reach MIRA FIVE. */
+    /** Whether server events reach MIRA FIVE. */
     public function sends(): bool
     {
         return $this->enabled && $this->secretKey !== '';

@@ -27,11 +27,4 @@ return [
 
     'script_url' => env('MIRAFIVE_SCRIPT_URL', 'https://cdn.mirafive.io/mira.js'),
 
-    'flags' => [
-        'refresh_seconds' => (int) env('MIRAFIVE_FLAGS_REFRESH', 30),
-
-        // The Laravel cache store that shares the flag document between requests; null is the default store.
-        'cache_store' => env('MIRAFIVE_FLAGS_CACHE'),
-    ],
-
 ];

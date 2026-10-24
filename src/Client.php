@@ -4,27 +4,18 @@ declare(strict_types=1);
 
 namespace MiraFive\Laravel;
 
-use Closure;
 use DateTimeInterface;
-use Illuminate\Container\Container;
 use Illuminate\Contracts\Auth\Authenticatable;
 use Illuminate\Http\Request;
 use InvalidArgumentException;
-use MiraFive\Flags\MiraFlags;
 use MiraFive\Mira;
 use MiraFive\MiraError;
 use MiraFive\Receipt;
 
-/** What the `Mira` facade calls: the container's `MiraFive\Mira` and `MiraFlags`, plus Laravel conveniences. */
+/** What the `Mira` facade calls: the container's `MiraFive\Mira`, plus Laravel conveniences. */
 class Client
 {
-    /**
-     * @param  Closure(): MiraFlags  $flags
-     */
-    public function __construct(
-        private readonly Mira $mira,
-        private readonly Closure $flags,
-    ) {}
+    public function __construct(private readonly Mira $mira) {}
 
     /**
      * Buffers one event; sent after the response. Pass your own pseudonymous user id, never an email address.
@@ -69,12 +60,7 @@ class Client
         $this->mira->flush();
     }
 
-    public function flags(): MiraFlags
-    {
-        return ($this->flags)();
-    }
-
-    /** Tracks, identifies and reads flags as this user, with getAuthIdentifier() as the user id. */
+    /** Tracks and identifies as this user, with getAuthIdentifier() as the user id. */
     public function forUser(Authenticatable $user): UserContext
     {
         $id = $user->getAuthIdentifier();
@@ -86,17 +72,9 @@ class Client
         return new UserContext($this, (string) $id);
     }
 
-    /** Whether the request opts out of tracking (`Sec-GPC: 1` or `DNT: 1`), for MiraFlags::for(optedOut: …). */
+    /** Whether the request opts out of tracking (`Sec-GPC: 1` or `DNT: 1`). */
     public function optedOut(Request $request): bool
     {
         return $request->headers->get('Sec-GPC') === '1' || $request->headers->get('DNT') === '1';
-    }
-
-    /** optedOut() for the request being handled; false outside one. Resolved per call, as this client outlives requests. */
-    public function currentRequestOptedOut(): bool
-    {
-        $app = Container::getInstance();
-
-        return $app->bound('request') && $this->optedOut($app->make(Request::class));
     }
 }

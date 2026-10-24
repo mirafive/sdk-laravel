@@ -15,10 +15,8 @@ use MiraFive\Mode;
  * @method static void identify(string $userId, array<string, mixed> $traits = [], ?string $anonymousId = null, \DateTimeInterface|int|null $time = null)
  * @method static \MiraFive\Receipt send(list<array<string, mixed>> $events, ?string $idempotencyKey = null)
  * @method static void flush()
- * @method static \MiraFive\Flags\MiraFlags flags()
  * @method static \MiraFive\Laravel\UserContext forUser(\Illuminate\Contracts\Auth\Authenticatable $user)
  * @method static bool optedOut(\Illuminate\Http\Request $request)
- * @method static bool currentRequestOptedOut()
  *
  * @see Client
  */

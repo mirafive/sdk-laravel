@@ -12,16 +12,12 @@ use Illuminate\Contracts\Config\Repository as Config;
 use Illuminate\Contracts\Container\Container;
 use Illuminate\Contracts\Events\Dispatcher as Events;
 use Illuminate\Contracts\Foundation\Application;
-use Illuminate\Contracts\Http\Kernel as HttpKernelContract;
-use Illuminate\Foundation\Http\Kernel as HttpKernel;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\View\Compilers\BladeCompiler;
-use MiraFive\Flags\MiraFlags;
 use MiraFive\Http\CurlTransport;
 use MiraFive\Http\StreamTransport;
 use MiraFive\Http\Transport;
 use MiraFive\Laravel\Console\CheckCommand;
-use MiraFive\Laravel\Http\Middleware\SendBootstrapHeaders;
 use MiraFive\Laravel\Queue\SendBatch;
 use MiraFive\Mira;
 use Psr\Log\LoggerInterface;
@@ -62,20 +58,14 @@ final class MiraFiveServiceProvider extends ServiceProvider
                 mode: $settings->mode,
                 transport: $app->make(Transport::class),
                 logger: $app->make(LoggerInterface::class),
-                cache: $sends ? $app->make(CacheFactory::class)->store($settings->cacheStore) : null,
+                cache: $sends ? $app->make(CacheFactory::class)->store() : null,
                 enabled: $sends,
                 flushOnShutdown: false,
-                flagsRefreshSeconds: $settings->refreshSeconds,
                 handOff: $sends && $settings->queued() ? self::handOff($settings) : null,
             );
         });
 
-        $this->app->singleton(MiraFlags::class, fn (Application $app): MiraFlags => $app->make(Mira::class)->flags());
-
-        $this->app->singleton(Client::class, fn (Application $app): Client => new Client(
-            $app->make(Mira::class),
-            fn (): MiraFlags => $app->make(MiraFlags::class),
-        ));
+        $this->app->singleton(Client::class, fn (Application $app): Client => new Client($app->make(Mira::class)));
     }
 
     public function boot(): void
@@ -88,13 +78,6 @@ final class MiraFiveServiceProvider extends ServiceProvider
         $this->callAfterResolving('blade.compiler', function (BladeCompiler $blade): void {
             $tags = '\Illuminate\Container\Container::getInstance()->make(\MiraFive\Laravel\View\Tags::class)';
             $blade->directive('mirafiveScript', fn (string $expression): string => "<?php echo {$tags}->script({$expression}); ?>");
-            $blade->directive('mirafiveFlags', fn (string $expression): string => "<?php echo {$tags}->flags({$expression}); ?>");
-        });
-
-        $this->callAfterResolving(HttpKernelContract::class, function (HttpKernelContract $kernel): void {
-            if ($kernel instanceof HttpKernel) {
-                $kernel->pushMiddleware(SendBootstrapHeaders::class);
-            }
         });
 
         $this->app->terminating(static function (Container $app): void {
@@ -142,7 +125,7 @@ final class MiraFiveServiceProvider extends ServiceProvider
     }
 
     /**
-     * Octane otherwise builds these per request: a new cURL handle and an empty flag document each time. They hold no
+     * Octane otherwise builds these per request: a new cURL handle each time. They hold no
      * request state; the buffer is flushed after every request.
      */
     private function warmUnderOctane(): void
@@ -151,7 +134,7 @@ final class MiraFiveServiceProvider extends ServiceProvider
         $warm = $config->get('octane.warm');
 
         if (is_array($warm)) {
-            $config->set('octane.warm', array_values(array_unique([...array_filter($warm, is_string(...)), Transport::class, Mira::class, MiraFlags::class, Client::class])));
+            $config->set('octane.warm', array_values(array_unique([...array_filter($warm, is_string(...)), Transport::class, Mira::class, Client::class])));
         }
     }
 }

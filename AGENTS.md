@@ -1,7 +1,6 @@
 # AGENTS.md
 
-`mirafive/sdk-laravel`: the Laravel integration of MIRA FIVE. It wraps `mirafive/sdk-php` and adds no transport or
-flag evaluation of its own. The public surface is fixed by the `mirafive/sdk-laravel` section of `API.md` in the
+`mirafive/sdk-laravel`: the Laravel integration of MIRA FIVE. It wraps `mirafive/sdk-php` and adds no transport of its own. The public surface is fixed by the `mirafive/sdk-laravel` section of `API.md` in the
 protocol repository; change it there first.
 
 ## Local development
@@ -33,7 +32,7 @@ and stays red until `mirafive/sdk-php` 1.0 is published on Packagist.
 - Octane: no request state in singletons. The core buffer is flushed after every request; anything per request
   lives on the request (see `Tags::BOOTSTRAPPED`) or is resolved from `Container::getInstance()` at call time.
 - Build on the core's seams, never around them: `enabled`, `flushOnShutdown: false` (Laravel flushes on terminate),
-  `handOff` + `deliverPrepared` for queues, `flagsRefreshSeconds`. The disabled client still throws on bad input.
+  `handOff` + `deliverPrepared` for queues. The disabled client still throws on bad input.
 - Tests never touch the network: bind `tests/Support/FakeTransport` as `MiraFive\Http\Transport` (`TestCase` does).
 - Comments only for non-obvious constraints, one or two lines.
 - Do not run git write commands; the maintainer commits.

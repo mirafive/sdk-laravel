@@ -22,9 +22,7 @@ it('records nothing and reports nothing', function (Closure $switchOff): void {
     app()->terminate();
 
     expect($this->transport->requests)->toBeEmpty()
-        ->and($receipt->dropped)->toBe(0)
-        ->and(Mira::flags()->for(userId: 'u_42')->enabled('new-checkout', true))->toBeTrue()
-        ->and(Mira::flags()->for(userId: 'u_42')->variant('pricing', 'control'))->toBe('control');
+        ->and($receipt->dropped)->toBe(0);
 
     Log::shouldNotHaveReceived('warning');
 })->with('off');

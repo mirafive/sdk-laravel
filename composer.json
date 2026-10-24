@@ -3,7 +3,7 @@
     "description": "MIRA FIVE SDK for Laravel",
     "type": "library",
     "license": "MIT",
-    "keywords": ["analytics", "privacy", "gdpr", "feature-flags", "experiments", "laravel", "mirafive"],
+    "keywords": ["analytics", "privacy", "gdpr", "laravel", "mirafive"],
     "homepage": "https://mirafive.io",
     "authors": [
         {

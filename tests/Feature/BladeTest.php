@@ -3,10 +3,8 @@
 declare(strict_types=1);
 
 use Illuminate\Support\Facades\Blade;
-use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Vite;
 use Illuminate\View\ViewException;
-use MiraFive\Laravel\Facades\Mira;
 
 beforeEach(function (): void {
     config()->set('mirafive.website_key', 'mf_ab12cd34_site');
@@ -61,44 +59,4 @@ it('prints nothing without a website key', function (): void {
     config()->set('mirafive.website_key', null);
 
     expect(Blade::render('@mirafiveScript'))->toBe('');
-});
-
-it('prints an escaped flag bootstrap with only the flags the website reads', function (): void {
-    $this->transport->queue(flagDocument());
-
-    $html = Blade::render("@mirafiveFlags(['userId' => 42, 'properties' => ['plan' => 'pro']])");
-    $json = json_decode(substr($html, strlen('<script type="application/json" id="mirafive-flags">'), -strlen('</script>')), true);
-
-    expect($html)->toStartWith('<script type="application/json" id="mirafive-flags">')
-        ->and(substr_count($html, '</script>'))->toBe(1)
-        ->and($html)->toContain('</script>')->not->toContain('internal-token')
-        ->and($json['values']['new-checkout'])->toBe(['on']);
-});
-
-it('takes flags the controller already read', function (): void {
-    $this->transport->queue(flagDocument());
-    $flags = Mira::flags()->for(userId: 'u_42');
-
-    expect(Blade::render('@mirafiveFlags($flags)', ['flags' => $flags]))->toContain('"new-checkout":["on"]');
-});
-
-it('refuses an unknown unit key', function (): void {
-    Blade::render("@mirafiveFlags(['user' => 'u_42'])");
-})->throws(ViewException::class, 'not user');
-
-it('keeps pages with a bootstrap out of shared caches', function (): void {
-    Route::get('/flags', fn () => Blade::render("<html>@mirafiveFlags(['userId' => 'u_42'])</html>"));
-    Route::get('/plain', fn () => Blade::render('<html>@mirafiveScript</html>'));
-
-    $this->get('/flags')->assertHeader('Cache-Control', 'no-store, private');
-    expect($this->get('/plain')->headers->get('Cache-Control'))->not->toContain('no-store');
-});
-
-it('treats Sec-GPC as an opt-out', function (): void {
-    $this->transport->queue(flagDocument());
-    Route::get('/flags', fn () => Blade::render("@mirafiveFlags(['userId' => 'u_42'])"));
-
-    $html = $this->get('/flags', ['Sec-GPC' => '1'])->getContent();
-
-    expect($html)->not->toContain('"unit"');
 });

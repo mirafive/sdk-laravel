@@ -63,7 +63,6 @@ it('tracks and identifies as the signed-in user', function (): void {
 
     $fake->assertTracked('signup', fn (array $event): bool => $event['userId'] === '42');
     $fake->assertIdentified('42');
-    expect($user->flags()->enabled('new-checkout'))->toBeFalse();
 });
 
 it('still refuses what the collector would refuse', function (): void {

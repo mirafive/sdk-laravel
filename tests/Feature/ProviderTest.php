@@ -3,7 +3,6 @@
 declare(strict_types=1);
 
 use Illuminate\Support\ServiceProvider;
-use MiraFive\Flags\MiraFlags;
 use MiraFive\Laravel\Client;
 use MiraFive\Laravel\Facades\Mira as MiraFacade;
 use MiraFive\Laravel\MiraFiveServiceProvider;
@@ -11,19 +10,16 @@ use MiraFive\Laravel\Settings;
 use MiraFive\Mira;
 use MiraFive\Mode;
 
-it('binds the core client, flags and facade root as singletons', function (): void {
+it('binds the core client and facade root as singletons', function (): void {
     expect(app(Mira::class))->toBe(app(Mira::class))
-        ->and(app(MiraFlags::class))->toBe(app(MiraFlags::class))
         ->and(app(Client::class))->toBe(app(Client::class))
-        ->and(MiraFacade::getFacadeRoot())->toBe(app(Client::class))
-        ->and(MiraFacade::flags())->toBe(app(MiraFlags::class));
+        ->and(MiraFacade::getFacadeRoot())->toBe(app(Client::class));
 });
 
 it('merges the default configuration', function (): void {
     expect(config('mirafive.mode'))->toBe('full')
         ->and(config('mirafive.script_mode'))->toBe('consentless')
         ->and(config('mirafive.script_url'))->toBe('https://cdn.mirafive.io/mira.js')
-        ->and(config('mirafive.flags.refresh_seconds'))->toBe(30)
         ->and(config('mirafive.queue'))->toBeEmpty();
 });
 
@@ -66,15 +62,3 @@ it('refuses an unknown mode', function (): void {
 
     app(Mira::class);
 })->throws(InvalidArgumentException::class, 'mirafive.mode is "full" or "consentless"');
-
-it('shares the flag document between processes through the cache store', function (): void {
-    config()->set('mirafive.flags.cache_store', 'array');
-    $this->transport->queue(flagDocument());
-
-    expect(app(MiraFlags::class)->for(userId: 'u_42')->enabled('new-checkout'))->toBeTrue();
-
-    app()->forgetInstance(MiraFlags::class);
-
-    expect(app(MiraFlags::class)->for(userId: 'u_42')->enabled('new-checkout'))->toBeTrue()
-        ->and($this->transport->requests)->toHaveCount(1);
-});

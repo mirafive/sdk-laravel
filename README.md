@@ -1,7 +1,7 @@
 # MIRA FIVE for Laravel
 
-Privacy-first analytics and feature flags for Laravel, hosted in the EU: track business events from your controllers
-and jobs, evaluate flags in-process, and add the website tracker with one Blade directive. Events are sent after the
+Privacy-first analytics for Laravel, hosted in the EU: track business events from your controllers
+and jobs, and add the website tracker with one Blade directive. Events are sent after the
 response, so your pages never wait for analytics.
 
 ## Install
@@ -52,8 +52,7 @@ use MiraFive\Laravel\Facades\Mira;
 Event::listen(Login::class, fn (Login $event) => Mira::forUser($event->user)->identify(['plan' => $event->user->plan]));
 ```
 
-`Mira::forUser($request->user())` fills in `getAuthIdentifier()` as the user id for `track()`, `identify()` and
-`flags()`.
+`Mira::forUser($request->user())` fills in `getAuthIdentifier()` as the user id for `track()` and `identify()`.
 
 Add the tracker to your layout's `<head>`:
 
@@ -101,7 +100,7 @@ Rules for both modes:
 
 | Key | Env | Default | |
 |---|---|---|---|
-| `enabled` | `MIRAFIVE_ENABLED` | `true` | Off, or without a secret key: nothing is sent and no key is needed, flags answer their fallbacks. Off also omits the tracker tag |
+| `enabled` | `MIRAFIVE_ENABLED` | `true` | Off, or without a secret key: nothing is sent and no key is needed. Off also omits the tracker tag |
 | `secret_key` | `MIRAFIVE_SECRET_KEY` | — | Secret key of a server source |
 | `website_key` | `MIRAFIVE_WEBSITE_KEY` | — | Public key of a website source, for `@mirafiveScript` |
 | `host` | `MIRAFIVE_HOST` | `https://events.mirafive.io` | Collector, with scheme |
@@ -109,12 +108,11 @@ Rules for both modes:
 | `script_mode` | `MIRAFIVE_SCRIPT_MODE` | `consentless` | The tracker from `@mirafiveScript`: `consentless` or `full` |
 | `queue` | `MIRAFIVE_QUEUE` | `null` | `null` sends after the response; `mirafive` or `redis:mirafive` (connection:queue) dispatches a job per batch |
 | `script_url` | `MIRAFIVE_SCRIPT_URL` | `https://cdn.mirafive.io/mira.js` | Tracker script, e.g. a self-hosted copy |
-| `flags.refresh_seconds` | `MIRAFIVE_FLAGS_REFRESH` | `30` | How old the flag document may get (at least 10) |
-| `flags.cache_store` | `MIRAFIVE_FLAGS_CACHE` | default store | Laravel cache store that shares the flag document between requests |
 
-Delivery failures go to your default log channel as warnings. `MiraFive\Mira` and `MiraFive\Flags\MiraFlags` can be
+Delivery failures go to your default log channel as warnings. `MiraFive\Mira` can be
 injected directly; to send through your own HTTP client, bind `MiraFive\Http\Transport` (e.g. to
-`MiraFive\Http\Psr18Transport`) before they are resolved.
+`MiraFive\Http\Psr18Transport`) before it is resolved. The default cache store holds the delivery pause of the core
+client, so it applies to every PHP process during an outage.
 
 ## Queues & Octane
 
@@ -132,45 +130,8 @@ quietly. Batches are up to 1 MiB of JSON (SQS allows 256 KB). `send()` never que
 it always sends immediately and returns the collector's receipt.
 
 **Octane.** The package is safe in long-running workers: no request state is kept in singletons, and the buffer is
-flushed at the end of every request. It adds `MiraFive\Mira`, `MiraFlags`, the transport and the facade's client to
-`octane.warm`, so a worker keeps one HTTP connection and one flag document instead of building them per request.
-
-## Flags
-
-```php
-$flags = Mira::flags()->for(
-    userId: (string) $user->id,
-    properties: ['plan' => $user->plan],
-    consent: ['experiments' => true, 'targeting' => false],
-    optedOut: Mira::optedOut($request),   // Sec-GPC: 1 or DNT: 1
-);
-
-$flags->enabled('new-checkout');           // bool
-$flags->variant('pricing-test');           // ?string
-$flags->config('limits', ['max' => 3]);    // the variant's value
-```
-
-Or `Mira::forUser($request->user())->flags(properties: [...])`, which reads the opt-out from the current request
-unless you pass `optedOut`. Reads never throw; without a document every flag
-answers its fallback. The document is fetched on first use and shared between requests through the cache store.
-
-**Bootstrap in Blade.** Hand the server's answers to the browser SDK so the first paint shows the right variant:
-
-```blade
-<head>
-    @mirafiveFlags(['userId' => auth()->id(), 'properties' => ['plan' => auth()->user()?->plan]])
-    @mirafiveScript(['data-flags' => true])
-</head>
-```
-
-The unit takes `userId`, `anonymousId`, `properties`, `consent` and `optedOut` (read from `Sec-GPC`/`DNT` when left
-out). You can also pass flags you already read: `@mirafiveFlags($flags)`. Only flags your website reads are included,
-and every value is escaped so it cannot end the script.
-
-A page carrying a bootstrap must never be stored by a shared cache. The package adds `Cache-Control: private,
-no-store` to every response whose view printed `@mirafiveFlags`; nothing to configure. If you print
-`$flags->bootstrap()` yourself, send the header yourself:
-`response($html)->withHeaders(MiraFive\Flags\MiraFlags::BOOTSTRAP_HEADERS)`.
+flushed at the end of every request. It adds `MiraFive\Mira`, the transport and the facade's client to
+`octane.warm`, so a worker keeps one HTTP connection instead of building it per request.
 
 ## Testing with `Mira::fake()`
 
@@ -195,8 +156,7 @@ it('stays quiet', function () {
 ```
 
 The fake records `track()`, `identify()` and `send()` through the facade and through an injected
-`MiraFive\Laravel\Client`. Input is still checked, so an event MIRA FIVE would refuse fails the test. Flags answer their
-fallbacks. Code that injects `MiraFive\Mira` directly is not faked; set `MIRAFIVE_ENABLED=false` in `phpunit.xml` so
+`MiraFive\Laravel\Client`. Input is still checked, so an event MIRA FIVE would refuse fails the test. Code that injects `MiraFive\Mira` directly is not faked; set `MIRAFIVE_ENABLED=false` in `phpunit.xml` so
 it sends nothing.
 
 ## Troubleshooting
@@ -209,8 +169,6 @@ it sends nothing.
   identifiers or switch to `full` where you hold consent.
 - **No tracker tag.** `MIRAFIVE_WEBSITE_KEY` is empty or `MIRAFIVE_ENABLED` is false.
 - **Queued batches never arrive.** A worker must run the configured queue (`php artisan queue:work redis --queue=mirafive`).
-- **Flags always answer the fallback.** Check `Mira::flags()->status()` and `->evaluate($key)->errorCode`:
-  `NOT_READY` means no document (see the log), `FLAG_NOT_FOUND` that the flag is not served to this source.
 
 ## For AI agents
 
@@ -241,17 +199,16 @@ Add MIRA FIVE analytics to this Laravel application with the Composer package mi
 Facts for agents:
 
 - Package `mirafive/sdk-laravel`, namespace `MiraFive\Laravel`, facade `MiraFive\Laravel\Facades\Mira` (alias `Mira`),
-  wrapping `mirafive/sdk-php` (`MiraFive\Mira`, `MiraFive\Flags\MiraFlags`, both container singletons).
+  wrapping `mirafive/sdk-php` (`MiraFive\Mira`, a container singleton).
 - Env: `MIRAFIVE_SECRET_KEY`, `MIRAFIVE_WEBSITE_KEY`, `MIRAFIVE_HOST`, `MIRAFIVE_MODE` (server, default `full`), `MIRAFIVE_SCRIPT_MODE` (tracker, default `consentless`),
-  `MIRAFIVE_QUEUE`, `MIRAFIVE_ENABLED`, `MIRAFIVE_SCRIPT_URL`, `MIRAFIVE_FLAGS_REFRESH`, `MIRAFIVE_FLAGS_CACHE`.
+  `MIRAFIVE_QUEUE`, `MIRAFIVE_ENABLED`, `MIRAFIVE_SCRIPT_URL`.
   Config file `config/mirafive.php`, publish tag `mirafive-config`.
 - Facade: `track(name, userId:, anonymousId:, sessionId:, properties:, time:, page:)`, `identify(userId, traits)`,
   `send(events, idempotencyKey:)` (immediate, returns `MiraFive\Receipt`, throws `MiraFive\MiraError`), `flush()`,
-  `flags()`, `forUser($user)`, `optedOut($request)`, `fake()`.
+  `forUser($user)`, `optedOut($request)`, `fake()`.
 - Buffered events are flushed on terminate, Octane `RequestTerminated`, and after each queued job. Never call
   `flush()` in normal code.
-- Blade: `@mirafiveScript` / `@mirafiveScript([...data attributes])`, `@mirafiveFlags($unit)` (sets
-  `Cache-Control: private, no-store` automatically).
+- Blade: `@mirafiveScript` / `@mirafiveScript([...data attributes])`.
 - Without a secret key, or with `MIRAFIVE_ENABLED=false`, nothing is sent and no key is needed; invalid events still throw.
 - With `MIRAFIVE_QUEUE`, buffered batches go to `SendBatch` jobs; `send()` is always synchronous.
 - `php artisan mirafive:check` proves key and host; success is a receipt with reason `install_check`.
