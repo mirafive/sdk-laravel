@@ -11,7 +11,7 @@ beforeEach(function (): void {
 });
 
 it('prints the tracker with the website key', function (): void {
-    config()->set('mirafive.host', 'https://events.mirafive.io');
+    config()->set('mirafive.host', 'https://collect.mirafive.io');
 
     expect(Blade::render('@mirafiveScript'))->toBe(
         '<script>window.mirafive=window.mirafive||function(){(mirafive.q=mirafive.q||[]).push(arguments)}</script>'."\n"

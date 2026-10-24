@@ -41,6 +41,8 @@ public function store(Request $request)
 }
 ```
 
+For revenue, add `payment_id` (1–255 characters) to the properties next to `revenue` and `currency`: the payment provider's id of the payment. For Stripe pass the PaymentIntent id from a webhook: `Mira::track('order completed', properties: ['revenue' => 49, 'currency' => 'EUR', 'payment_id' => $paymentIntent->id]);`. MIRA FIVE merges the event with the payment it imports from your connected Stripe account, so the sale counts once.
+
 Identify after login, with the user's internal id and a few traits:
 
 ```php
@@ -103,7 +105,7 @@ Rules for both modes:
 | `enabled` | `MIRAFIVE_ENABLED` | `true` | Off, or without a secret key: nothing is sent and no key is needed. Off also omits the tracker tag |
 | `secret_key` | `MIRAFIVE_SECRET_KEY` | — | Secret key of a server source |
 | `website_key` | `MIRAFIVE_WEBSITE_KEY` | — | Public key of a website source, for `@mirafiveScript` |
-| `host` | `MIRAFIVE_HOST` | `https://events.mirafive.io` | Collector, with scheme |
+| `host` | `MIRAFIVE_HOST` | `https://collect.mirafive.io` | Collector, with scheme |
 | `mode` | `MIRAFIVE_MODE` | `full` | Server events: `full` or `consentless` |
 | `script_mode` | `MIRAFIVE_SCRIPT_MODE` | `consentless` | The tracker from `@mirafiveScript`: `consentless` or `full` |
 | `queue` | `MIRAFIVE_QUEUE` | `null` | `null` sends after the response; `mirafive` or `redis:mirafive` (connection:queue) dispatches a job per batch |

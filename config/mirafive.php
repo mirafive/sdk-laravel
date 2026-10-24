@@ -13,7 +13,7 @@ return [
     // The public key of a website source, printed by @mirafiveScript.
     'website_key' => env('MIRAFIVE_WEBSITE_KEY'),
 
-    'host' => env('MIRAFIVE_HOST', 'https://events.mirafive.io'),
+    'host' => env('MIRAFIVE_HOST', 'https://collect.mirafive.io'),
 
     // Server events: "full" or "consentless". Consentless refuses userId, anonymousId and sessionId.
     'mode' => env('MIRAFIVE_MODE', 'full'),
