@@ -12,8 +12,8 @@ use MiraFive\MiraError;
 use Psr\Log\LoggerInterface;
 
 /**
- * One buffered batch as the core encoded it. The worker sends it with its own key; the body is final, so a job that
- * runs twice is stored once.
+ * One batch as the client handed it off. The worker sends it with its own key; the events and
+ * their sequence number are final, so a job that runs twice is stored once.
  */
 final class SendBatch implements ShouldQueue
 {
@@ -22,7 +22,7 @@ final class SendBatch implements ShouldQueue
     public int $tries = 5;
 
     public function __construct(
-        public string $body,
+        public string $payload,
         public ?string $connection = null,
         public ?string $queue = null,
     ) {}
@@ -37,26 +37,26 @@ final class SendBatch implements ShouldQueue
 
     public function handle(Mira $mira, Settings $settings, LoggerInterface $logger): void
     {
+        // Switched off on this worker: dropped on purpose, as everything else is.
         if (! $settings->enabled) {
             return;
         }
 
-        // A disabled core would answer with a local receipt, and the batch would be lost without a trace.
         if ($settings->secretKey === '') {
             $logger->error('[mirafive] A queued batch cannot be sent: MIRAFIVE_SECRET_KEY is not set on this worker.');
-            $this->fail(new MiraError('unauthorized', 'No secret key on this worker: set MIRAFIVE_SECRET_KEY.'));
+            $this->fail(new MiraError('no secret key on this worker: set MIRAFIVE_SECRET_KEY'));
 
             return;
         }
 
         try {
-            $mira->deliverPrepared($this->body);
+            $mira->deliverPrepared($this->payload);
         } catch (MiraError $error) {
             if ($error->retryable) {
                 throw $error;
             }
 
-            $logger->warning('[mirafive] {message}', ['message' => $error->getMessage(), 'exception' => $error]);
+            $logger->warning('[mirafive] {message}', ['message' => $error->getMessage(), 'exception' => $error, 'event_ids' => $error->eventIds]);
         }
     }
 }

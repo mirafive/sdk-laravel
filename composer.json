@@ -1,68 +1,82 @@
 {
-    "name": "mirafive/sdk-laravel",
-    "description": "MIRA FIVE SDK for Laravel",
-    "type": "library",
-    "license": "MIT",
-    "keywords": ["analytics", "privacy", "gdpr", "laravel", "mirafive"],
-    "homepage": "https://mirafive.io",
-    "authors": [
-        {
-            "name": "Cloo GmbH",
-            "homepage": "https://mirafive.io"
-        }
-    ],
-    "require": {
-        "php": "^8.3",
-        "illuminate/console": "^11.0|^12.0|^13.0",
-        "illuminate/contracts": "^11.0|^12.0|^13.0",
-        "illuminate/http": "^11.0|^12.0|^13.0",
-        "illuminate/queue": "^11.0|^12.0|^13.0",
-        "illuminate/support": "^11.0|^12.0|^13.0",
-        "illuminate/view": "^11.0|^12.0|^13.0",
-        "mirafive/sdk-php": "^1.0"
-    },
-    "require-dev": {
-        "larastan/larastan": "^3.13",
-        "laravel/pint": "^1.32",
-        "orchestra/testbench": "^9.18|^10.12|^11.3",
-        "pestphp/pest": "^4.7"
-    },
-    "autoload": {
-        "psr-4": {
-            "MiraFive\\Laravel\\": "src/"
-        }
-    },
-    "autoload-dev": {
-        "psr-4": {
-            "MiraFive\\Laravel\\Tests\\": "tests/"
-        }
-    },
-    "extra": {
-        "laravel": {
-            "providers": [
-                "MiraFive\\Laravel\\MiraFiveServiceProvider"
-            ],
-            "aliases": {
-                "Mira": "MiraFive\\Laravel\\Facades\\Mira"
-            }
-        }
-    },
-    "scripts": {
-        "lint": "pint",
-        "analyse": "phpstan analyse --memory-limit=1G",
-        "test": "pest",
-        "check": [
-            "pint --test",
-            "phpstan analyse --memory-limit=1G --no-progress",
-            "pest"
-        ]
-    },
-    "config": {
-        "sort-packages": true,
-        "allow-plugins": {
-            "pestphp/pest-plugin": true
-        }
-    },
-    "minimum-stability": "stable",
-    "prefer-stable": true
+  "name": "mirafive/sdk-laravel",
+  "description": "MIRA FIVE for Laravel: server events, revenue and touchpoints, the browser script tag, queues and test fakes",
+  "type": "library",
+  "license": "MIT",
+  "keywords": [
+    "analytics",
+    "attribution",
+    "revenue",
+    "gdpr",
+    "consent",
+    "laravel",
+    "mirafive"
+  ],
+  "homepage": "https://mirafive.io",
+  "support": {
+    "issues": "https://github.com/mirafive/sdk-laravel/issues",
+    "source": "https://github.com/mirafive/sdk-laravel"
+  },
+  "authors": [
+    {
+      "name": "Cloo GmbH",
+      "homepage": "https://mirafive.io"
+    }
+  ],
+  "require": {
+    "php": "^8.3",
+    "illuminate/console": "^12.0 || ^13.0",
+    "illuminate/contracts": "^12.0 || ^13.0",
+    "illuminate/http": "^12.0 || ^13.0",
+    "illuminate/queue": "^12.0 || ^13.0",
+    "illuminate/support": "^12.0 || ^13.0",
+    "illuminate/view": "^12.0 || ^13.0",
+    "mirafive/sdk-php": "^2.0"
+  },
+  "require-dev": {
+    "larastan/larastan": "^3.14",
+    "laravel/pint": "^1.32",
+    "orchestra/testbench": "^10.12 || ^11.3",
+    "pestphp/pest": "^4.7 || ^5.3",
+    "phpstan/phpstan-strict-rules": "^2.1"
+  },
+  "autoload": {
+    "psr-4": {
+      "MiraFive\\Laravel\\": "src/"
+    }
+  },
+  "autoload-dev": {
+    "psr-4": {
+      "MiraFive\\Laravel\\Tests\\": "tests/",
+      "Laravel\\Octane\\Events\\": "tests/Stubs/Octane/"
+    }
+  },
+  "extra": {
+    "laravel": {
+      "providers": [
+        "MiraFive\\Laravel\\MiraFiveServiceProvider"
+      ],
+      "aliases": {
+        "Mira": "MiraFive\\Laravel\\Facades\\Mira"
+      }
+    }
+  },
+  "scripts": {
+    "lint": "pint",
+    "analyse": "phpstan analyse --memory-limit=1G",
+    "test": "pest",
+    "check": [
+      "pint --test",
+      "phpstan analyse --memory-limit=1G --no-progress",
+      "pest"
+    ]
+  },
+  "config": {
+    "sort-packages": true,
+    "allow-plugins": {
+      "pestphp/pest-plugin": true
+    }
+  },
+  "minimum-stability": "stable",
+  "prefer-stable": true
 }

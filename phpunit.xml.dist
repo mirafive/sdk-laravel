@@ -16,7 +16,7 @@
     </source>
     <php>
         <env name="MIRAFIVE_SECRET_KEY" value="" force="true"/>
-        <env name="MIRAFIVE_WEBSITE_KEY" value="" force="true"/>
+        <env name="MIRAFIVE_PUBLIC_KEY" value="" force="true"/>
         <env name="MIRAFIVE_HOST" value="" force="true"/>
         <env name="MIRAFIVE_QUEUE" value="" force="true"/>
     </php>

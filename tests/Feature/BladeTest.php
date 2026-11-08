@@ -3,60 +3,62 @@
 declare(strict_types=1);
 
 use Illuminate\Support\Facades\Blade;
-use Illuminate\Support\Facades\Vite;
+use Illuminate\Support\Facades\Log;
 use Illuminate\View\ViewException;
+use MiraFive\Laravel\Settings;
+use MiraFive\Laravel\View\ScriptTag;
 
-beforeEach(function (): void {
-    config()->set('mirafive.website_key', 'mf_ab12cd34_site');
+it('prints the browser SDK with the public key', function (): void {
+    expect(Blade::render('@mirafiveScript'))->toBe(<<<'HTML'
+        <script>
+          window.mira = window.mira || function () {
+            (mira.q = mira.q || []).push(arguments);
+          };
+        </script>
+        <script async src="https://ingest.test/sdk/mira.js"
+          data-key="mira_pk_live_123"></script>
+        HTML);
 });
 
-it('prints the tracker with the website key', function (): void {
-    config()->set('mirafive.host', 'https://collect.mirafive.io');
+it('loads from the CDN for the default host', function (): void {
+    config()->set('mirafive.host', 'https://events.mirafive.io');
 
-    expect(Blade::render('@mirafiveScript'))->toBe(
-        '<script>window.mirafive=window.mirafive||function(){(mirafive.q=mirafive.q||[]).push(arguments)}</script>'."\n"
-        .'<script defer src="https://cdn.mirafive.io/mira.js" data-key="mf_ab12cd34_site"></script>',
-    );
+    expect(Blade::render('@mirafiveScript'))->toContain('src="https://cdn.mirafive.io/sdk/mira.js"'."\n".'  data-host="https://events.mirafive.io"');
 });
 
-it('adds a custom host and takes more attributes', function (): void {
+it('takes consent and autocapture from the config and the directive', function (): void {
+    config()->set('mirafive.script.consent', 'analytics');
+    config()->set('mirafive.script.autocapture', ['forms' => false]);
 
-    $html = Blade::render("@mirafiveScript(['data-autocapture' => true, 'data-site-search' => 'q,s', 'data-hash' => false])");
-
-    expect($html)->toContain('data-host="https://collector.test"')
-        ->toContain(' data-autocapture data-site-search="q,s"')
-        ->not->toContain('data-hash');
+    expect(Blade::render('@mirafiveScript'))->toContain('data-consent="analytics"'."\n".'  data-forms="false"')
+        ->and(Blade::render("@mirafiveScript(['consent' => 'granted', 'autocapture' => false, 'nonce' => 'abc'])"))
+        ->toContain('data-consent="granted"')
+        ->toContain('data-autocapture="false"')
+        ->toContain('<script nonce="abc">');
 });
 
-it('follows script_mode, not the server mode', function (): void {
-    config()->set('mirafive.mode', 'consentless');
-    config()->set('mirafive.script_mode', 'full');
-
-    expect(Blade::render('@mirafiveScript'))->toContain(' data-mode="full"');
-});
-
-it('escapes what it prints', function (): void {
-    config()->set('mirafive.website_key', '"><script>alert(1)</script>');
-
-    $html = Blade::render("@mirafiveScript(['data-site-search' => '\"onload=\"x'])");
-
-    expect($html)->toContain('data-key="&quot;&gt;&lt;script&gt;alert(1)&lt;/script&gt;"')
-        ->toContain('data-site-search="&quot;onload=&quot;x"')
-        ->and(substr_count($html, '<script'))->toBe(2);
-});
-
-it('refuses an attribute name that could break out of the tag', function (): void {
-    Blade::render("@mirafiveScript(['onload=x data-a' => true])");
-})->throws(ViewException::class, 'is not an attribute name');
-
-it('uses the Vite CSP nonce', function (): void {
-    Vite::useCspNonce('n0nce');
-
-    expect(substr_count(Blade::render('@mirafiveScript'), 'nonce="n0nce"'))->toBe(2);
-});
-
-it('prints nothing without a website key', function (): void {
-    config()->set('mirafive.website_key', null);
-
+it('prints nothing without a public key or when switched off', function (): void {
+    config()->set('mirafive.public_key', null);
     expect(Blade::render('@mirafiveScript'))->toBe('');
+
+    config()->set('mirafive.public_key', 'mira_pk_1');
+    config()->set('mirafive.enabled', false);
+    app()->forgetInstance(Settings::class);
+    app()->forgetInstance(ScriptTag::class);
+    expect(Blade::render('@mirafiveScript'))->toBe('');
+})->after(fn () => app()->forgetInstance(Settings::class));
+
+it('never prints a secret key', function (): void {
+    config()->set('mirafive.public_key', 'mira_sk_live_secretTail');
+    Log::spy();
+
+    $html = Blade::render('@mirafiveScript');
+
+    expect($html)->toBe('<!-- MIRA FIVE: the script tag was not printed, see the log -->')
+        ->and($html)->not->toContain('secretTail');
+    Log::shouldHaveReceived('error')->once();
 });
+
+it('refuses unknown options', function (): void {
+    Blade::render("@mirafiveScript(['mode' => 'full'])");
+})->throws(ViewException::class, '@mirafiveScript does not know mode');

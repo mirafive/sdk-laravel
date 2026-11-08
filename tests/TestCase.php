@@ -7,20 +7,22 @@ namespace MiraFive\Laravel\Tests;
 use MiraFive\Http\Transport;
 use MiraFive\Laravel\Facades\Mira;
 use MiraFive\Laravel\MiraFiveServiceProvider;
-use MiraFive\Laravel\Tests\Support\FakeTransport;
+use MiraFive\Testing\RecordingTransport;
 use Orchestra\Testbench\TestCase as Orchestra;
 
 abstract class TestCase extends Orchestra
 {
-    public const string SECRET_KEY = 'mf_ab12cd34_secretTail';
+    public const string SECRET_KEY = 'mira_sk_live_secretTail';
 
-    protected FakeTransport $transport;
+    public const string PUBLIC_KEY = 'mira_pk_live_123';
+
+    protected RecordingTransport $transport;
 
     protected function setUp(): void
     {
         parent::setUp();
 
-        $this->transport = new FakeTransport;
+        $this->transport = new RecordingTransport;
         $this->app?->instance(Transport::class, $this->transport);
     }
 
@@ -37,7 +39,18 @@ abstract class TestCase extends Orchestra
     protected function defineEnvironment($app): void
     {
         $app['config']->set('mirafive.secret_key', self::SECRET_KEY);
-        $app['config']->set('mirafive.host', 'https://collector.test');
+        $app['config']->set('mirafive.public_key', self::PUBLIC_KEY);
+        $app['config']->set('mirafive.host', 'https://ingest.test');
         $app['config']->set('cache.default', 'array');
+    }
+
+    /**
+     * Every event sent so far.
+     *
+     * @return list<array<string, mixed>>
+     */
+    protected function sent(): array
+    {
+        return array_merge(...array_map(static fn (array $batch): array => $batch['events'] ?? [], $this->transport->batches()));
     }
 }

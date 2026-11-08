@@ -13,5 +13,5 @@ uses(TestCase::class)->in('Feature');
  */
 function answer(int $status, ?array $body = null, array $headers = []): Response
 {
-    return new Response($status, $headers, $body === null ? '' : json_encode($body, JSON_THROW_ON_ERROR));
+    return new Response($status, $headers, $body === null ? '' : (string) json_encode($body));
 }

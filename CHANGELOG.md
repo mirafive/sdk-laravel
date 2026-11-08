@@ -1,26 +1,56 @@
 # Changelog
 
-## Unreleased
+## 2.0.0 — 2026-11-08
 
-- Revenue events may carry `payment_id`, the payment provider's id of the payment (1–255 characters), next to `revenue` and `currency`. Nothing changes in the API: pass it in the properties. The README shows a Stripe example.
-- The default ingest host is `https://collect.mirafive.io`.
+A rewrite for the MIRA FIVE platform, on [`mirafive/sdk-php`](https://github.com/mirafive/sdk-php)
+2.0. The 1.x package spoke the retired v1 collector protocol; 2.0 speaks the MIRA FIVE ingest and
+mirrors the Node SDK method for method. Laravel 12 and 13.
 
-- **Breaking:** feature flags and A/B experiments are removed: `Mira::flags()`, `UserContext::flags()`, the `MiraFlags` container binding, the `@mirafiveFlags` Blade directive, the `SendBootstrapHeaders` middleware, `Mira::currentRequestOptedOut()` and the `flags.refresh_seconds` and `flags.cache_store` config keys (`MIRAFIVE_FLAGS_REFRESH`, `MIRAFIVE_FLAGS_CACHE`). The delivery pause of the core client now uses the default cache store.
+### New
 
-## 1.0.0 — 2026-09-27
+- `Mira::group()`, `Mira::revenue()` (the revenue ledger: integer minor units, `entryId`,
+  `entryKind`, `fee`, `tax`, `refundOf`, `product`, subscriptions) and `Mira::touchpoint()` (survey
+  answers, offline contacts, redeemed codes).
+- `Mira::identify()` takes `externalIds`, so connectors link Stripe, RevenueCat, Shopify and
+  Shopware money to the user.
+- Per-event `consent` and `context`; `Mira::forRequest($request)` sends the request's IP and user
+  agent with every event.
+- `Mira::eventIdFor()`, identical to the Node SDK, for facts that may be reported twice.
+- `Mira::fake()` returns `MiraFive\Testing\MiraFake` with `assertRevenue()`, `assertTouchpoint()`,
+  `assertGrouped()` and `assertNoErrors()` next to the 1.x assertions.
+- `@mirafiveScript` prints the MIRA FIVE browser SDK with `consent` and `autocapture` options, and
+  never prints a secret key.
+- `mirafive:check` checks both keys and the host without storing anything.
 
-First release, on `mirafive/sdk-php` 1.0 (hand-off, `deliverPrepared`, `enabled` and `flushOnShutdown`).
+### Changed
 
-- Auto-discovered `MiraFiveServiceProvider` and `Mira` facade; `config/mirafive.php` (publish tag `mirafive-config`).
-- `MiraFive\Mira` and `MiraFive\Flags\MiraFlags` from the container, flushed when the application terminates, after
-  each Octane request, task and tick, and after each queued job. Warmed under Octane.
-- Disabled mode (`enabled` false or no secret key): nothing is sent and no key is needed; input is still checked.
-- Queued delivery (`MIRAFIVE_QUEUE`): each buffered batch is handed off encoded to a `SendBatch` job, which the worker
-  delivers byte for byte with its own key. `send()` stays synchronous.
-- Separate modes for server events (`mode`, default `full`) and the tracker tag (`script_mode`, default `consentless`).
-- Flag document shared between requests through a Laravel cache store.
-- Blade `@mirafiveScript` (hosted tracker with the website key, Vite CSP nonce) and `@mirafiveFlags($unit)` (bootstrap
-  block; the response is sent with `Cache-Control: private, no-store`).
-- `Mira::forUser($user)` and `Mira::optedOut($request)`.
-- `Mira::fake()` with `assertTracked`, `assertNotTracked`, `assertIdentified` and `assertNothingTracked`.
-- `php artisan mirafive:check` sends `$install_check` and prints the receipt.
+- `MIRAFIVE_WEBSITE_KEY` is now `MIRAFIVE_PUBLIC_KEY` (`mira_pk_…`); secret keys are `mira_sk_…`.
+- The default host is `https://events.mirafive.io`; the browser SDK loads from
+  `https://cdn.mirafive.io/sdk/mira.js` (`MIRAFIVE_SCRIPT_URL`).
+- The facade is the container's `MiraFive\Mira`; all methods take named arguments and never throw.
+- `Mira::forUser()` returns a client with the user filled in, with every method, not only `track`
+  and `identify`.
+- Queue jobs carry `{stream, seq, events}`; the worker adds `sent_at` when it sends.
+
+### Removed
+
+- `MIRAFIVE_MODE`, `MIRAFIVE_SCRIPT_MODE` and the consentless and full modes: consent is per event,
+  and the browser SDK follows your consent banner (`MIRAFIVE_CONSENT`).
+- `Mira::send()`, idempotency keys and `Receipt`: use `eventId: Mira::eventIdFor(…)` and
+  `Mira::flush()`.
+- `Mira::optedOut()`: pass the visitor's consent with the event instead.
+- `sessionId`, `$install_check`, `payment_id` and `mf_` keys.
+
+### Migrating from 1.x
+
+1. `composer require mirafive/sdk-laravel:^2.0`.
+2. In `.env`: set `MIRAFIVE_SECRET_KEY` to the new `mira_sk_…` key, rename `MIRAFIVE_WEBSITE_KEY`
+   to `MIRAFIVE_PUBLIC_KEY` with the `mira_pk_…` key, and drop `MIRAFIVE_MODE` and
+   `MIRAFIVE_SCRIPT_MODE`. Remove `MIRAFIVE_HOST` if it pointed to `collect.mirafive.io`.
+3. If you published `config/mirafive.php`, publish it again (`--force`) and reapply your changes.
+4. Update calls to named arguments: `Mira::track('signup', userId: 'u1', properties: […])` becomes
+   `Mira::track(event: 'signup', userId: 'u1', properties: […])`; `time:` is `timestamp:`.
+5. Move money from properties to `Mira::revenue(amount: 4900, currency: 'EUR', entryId: …)`.
+6. Replace `Mira::send($events, idempotencyKey: …)` with one call per event and
+   `eventId: Mira::eventIdFor(…)`.
+7. Run `php artisan mirafive:check`.

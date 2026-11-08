@@ -1,42 +1,25 @@
-# AGENTS.md
+# Working on mirafive/sdk-laravel
 
-`mirafive/sdk-laravel`: the Laravel integration of MIRA FIVE. It wraps `mirafive/sdk-php` and adds no transport of its own. The public surface is fixed by the `mirafive/sdk-laravel` section of `API.md` in the
-protocol repository; change it there first.
+Part of the MIRA FIVE SDKs (github.com/mirafive). Read README.md for what the package does.
 
-## Local development
+## Commands
 
-`mirafive/sdk-php` is not on Packagist yet. `composer.json` keeps requiring `mirafive/sdk-php: ^1.0`; for local work
-use the gitignored `composer.local.json`, a copy of `composer.json` that adds a path repository to the sibling checkout:
-
-```json
-"repositories": [
-    {"type": "path", "url": "../sdk-php", "options": {"symlink": true, "versions": {"mirafive/sdk-php": "1.0.0"}}}
-]
+```sh
+composer install
+composer check    # Pint, PHPStan (max), Pest: exactly what CI runs on PHP 8.3 and 8.5
 ```
-
-```bash
-COMPOSER=composer.local.json composer install
-COMPOSER=composer.local.json composer check   # pint --test, phpstan (larastan, level max), pest
-vendor/bin/pint                                # fix formatting
-vendor/bin/pest                                # tests only
-```
-
-Keep `composer.local.json` in step with `composer.json` when dependencies change. CI installs from `composer.json`
-and stays red until `mirafive/sdk-php` 1.0 is published on Packagist.
 
 ## Rules
 
-- PHP 8.3 syntax and functions only (no property hooks, asymmetric visibility, pipe operator, `array_find`, …).
-  CI runs PHP 8.3–8.5 against Laravel 11, 12 and 13; Laravel 11 needs `audit.block-insecure` off to install.
-- Never reimplement delivery, retries or evaluation. If the core lacks a hook, describe the change for sdk-php.
-- Octane: no request state in singletons. The core buffer is flushed after every request; anything per request
-  lives on the request (see `Tags::BOOTSTRAPPED`) or is resolved from `Container::getInstance()` at call time.
-- Build on the core's seams, never around them: `enabled`, `flushOnShutdown: false` (Laravel flushes on terminate),
-  `handOff` + `deliverPrepared` for queues. The disabled client still throws on bad input.
-- Tests never touch the network: bind `tests/Support/FakeTransport` as `MiraFive\Http\Transport` (`TestCase` does).
-- Comments only for non-obvious constraints, one or two lines.
-- Do not run git write commands; the maintainer commits.
+- No required Composer dependencies besides PHP, `mirafive/sdk-php` and the framework; PSR packages are suggestions.
+- Event methods never throw into the host and never hold a request: report problems instead.
+- A secret key (`mira_sk_…`) never reaches a template; a public key (`mira_pk_…`) is refused
+  on the server.
+- The wire format is defined by `@mirafive/protocol` (github.com/mirafive/protocol). The Node SDK
+  is the reference for behaviour; `eventIdFor` must match its vectors.
+- Tests for every change. Comments explain why, briefly. Conventional Commits.
 
 ## Releasing
 
-To release, add a `## X.Y.Z — YYYY-MM-DD` section to `CHANGELOG.md`, commit, then `git tag vX.Y.Z && git push origin vX.Y.Z`. `.github/workflows/release.yml` checks the changelog, runs `composer check` and creates the GitHub release; Packagist picks the tag up by itself.
+Add a `## x.y.z — YYYY-MM-DD` section to CHANGELOG.md and merge to main: the
+release workflow tags `vx.y.z` and creates the GitHub release; Packagist reads the tag.

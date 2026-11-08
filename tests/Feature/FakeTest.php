@@ -2,78 +2,36 @@
 
 declare(strict_types=1);
 
-use Illuminate\Auth\GenericUser;
-use MiraFive\Laravel\Client;
+use Illuminate\Support\Facades\Route;
 use MiraFive\Laravel\Facades\Mira;
-use PHPUnit\Framework\ExpectationFailedException;
 
-it('records calls instead of sending them', function (): void {
+it('records what the app sent instead of sending it', function (): void {
     $fake = Mira::fake();
 
-    Mira::track('signup', userId: 'u_42', properties: ['plan' => 'pro']);
-    Mira::track('signup', userId: 'u_43');
-    Mira::identify('u_42', ['plan' => 'pro']);
-    $receipt = Mira::send([['name' => 'order completed', 'properties' => ['revenue' => 99]]]);
-    app()->terminate();
+    Route::post('/signup', function () {
+        Mira::identify('u_1', traits: ['plan' => 'pro'], externalIds: ['stripe_customer' => 'cus_1']);
+        Mira::track('signup', userId: 'u_1');
+        Mira::touchpoint('survey', userId: 'u_1', source: 'podcast');
 
-    $fake->assertTracked('signup');
-    $fake->assertTracked('signup', 2);
-    $fake->assertTracked('signup', fn (array $event): bool => $event['properties'] === ['plan' => 'pro']);
-    $fake->assertTracked('order completed', fn (array $event): bool => $event['properties']['revenue'] === 99);
-    $fake->assertNotTracked('refund');
-    $fake->assertNotTracked('signup', fn (array $event): bool => $event['userId'] === 'u_99');
-    $fake->assertIdentified('u_42');
-    $fake->assertIdentified('u_42', fn (array $call): bool => $call['traits'] === ['plan' => 'pro']);
+        return 'ok';
+    });
 
-    expect($receipt->accepted)->toBe(1)
-        ->and($this->transport->requests)->toBeEmpty();
+    $this->post('/signup')->assertOk();
+
+    $fake->assertIdentified('u_1', fn (array $event): bool => $event['external_ids'] === ['stripe_customer' => 'cus_1']);
+    $fake->assertTracked('signup', 1);
+    $fake->assertTouchpoint(fn (array $event): bool => $event['properties']['source'] === 'podcast');
+    $fake->assertNotTracked('login');
+    $fake->assertNoErrors();
+
+    expect($this->transport->requests())->toBe([]);
 });
 
-it('fails when the expectation is not met', function (Closure $assertion): void {
-    $fake = Mira::fake();
-    Mira::track('signup');
-
-    expect(fn () => $assertion($fake))->toThrow(ExpectationFailedException::class);
-})->with([
-    'tracked' => fn ($fake) => $fake->assertTracked('refund'),
-    'count' => fn ($fake) => $fake->assertTracked('signup', 2),
-    'not tracked' => fn ($fake) => $fake->assertNotTracked('signup'),
-    'identified' => fn ($fake) => $fake->assertIdentified('u_42'),
-    'nothing' => fn ($fake) => $fake->assertNothingTracked(),
-]);
-
-it('asserts that nothing was tracked', function (): void {
-    Mira::fake()->assertNothingTracked();
-});
-
-it('is what the container hands out while faked', function (): void {
+it('fails a test on input the ingest would refuse', function (): void {
     $fake = Mira::fake();
 
-    app(Client::class)->track('signup');
+    Mira::revenue(19.99, 'EUR');
 
-    $fake->assertTracked('signup');
+    $fake->assertNothingTracked();
+    expect($fake->errors()[0]->getMessage())->toBe('revenue: amount must be an integer in minor units (1999 for 19.99)');
 });
-
-it('tracks and identifies as the signed-in user', function (): void {
-    $fake = Mira::fake();
-    $user = Mira::forUser(new GenericUser(['id' => 42]));
-
-    $user->track('signup', ['plan' => 'pro']);
-    $user->identify(['plan' => 'pro']);
-
-    $fake->assertTracked('signup', fn (array $event): bool => $event['userId'] === '42');
-    $fake->assertIdentified('42');
-});
-
-it('still refuses what the collector would refuse', function (): void {
-    Mira::fake();
-
-    Mira::track('$made-up');
-})->throws(InvalidArgumentException::class);
-
-it('keeps the configured mode', function (): void {
-    config()->set('mirafive.mode', 'consentless');
-    Mira::fake();
-
-    Mira::track('signup', userId: 'u_42');
-})->throws(InvalidArgumentException::class, 'consentless');

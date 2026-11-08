@@ -2,47 +2,35 @@
 
 declare(strict_types=1);
 
-it('sends an install check and prints the receipt', function (): void {
-    $this->transport->queue(answer(202, ['batch' => '0192d4a8-7b1c-4e8a-9c1d-2b3e4f5a6b7c', 'accepted' => 0, 'dropped' => 1, 'reason' => 'install_check']));
+it('passes when the ingest takes the key', function (): void {
+    $this->transport->answerNext(answer(200, ['ok' => true, 'key' => 'secret']));
 
     $this->artisan('mirafive:check')
-        ->expectsOutputToContain('mf_ab12cd34_…')
-        ->expectsOutputToContain('0192d4a8-7b1c-4e8a-9c1d-2b3e4f5a6b7c')
-        ->expectsOutputToContain('install_check')
-        ->doesntExpectOutputToContain('secretTail')
+        ->expectsOutputToContain('mira_sk_live…')
+        ->expectsOutputToContain('The secret key and host work')
         ->assertSuccessful();
 
-    expect($this->transport->batch(0)['events'])->toHaveCount(1)
-        ->and($this->transport->batch(0)['events'][0]['name'])->toBe('$install_check');
+    expect($this->transport->requests()[0]['method'])->toBe('GET')
+        ->and($this->transport->requests()[0]['url'])->toEndWith('/v1/check');
 });
 
-it('fails with the protocol code when the key is refused', function (): void {
-    $this->transport->queue(answer(401, ['code' => 'unauthorized', 'detail' => 'unknown key']));
+it('fails for a key the ingest does not know', function (): void {
+    $this->transport->answerNext(answer(401, ['error' => 'unknown_key']));
 
-    $this->artisan('mirafive:check')->expectsOutputToContain('unauthorized')->assertFailed();
+    $this->artisan('mirafive:check')->expectsOutputToContain('unknown_key')->assertFailed();
 });
 
-it('fails when the host is not a MIRA FIVE collector', function (): void {
-    $this->artisan('mirafive:check')->expectsOutputToContain('not with reason')->assertFailed();
-});
+it('fails without a secret key, with a public key in its place, or a secret key as the public key', function (array $config, string $message): void {
+    foreach ($config as $key => $value) {
+        config()->set($key, $value);
+    }
 
-it('fails without a secret key', function (): void {
-    config()->set('mirafive.secret_key', '');
+    $this->artisan('mirafive:check')->expectsOutputToContain($message)->assertFailed();
 
-    $this->artisan('mirafive:check')->expectsOutputToContain('MIRAFIVE_SECRET_KEY')->assertFailed();
-
-    expect($this->transport->requests)->toBeEmpty();
-});
-
-it('fails when disabled', function (): void {
-    config()->set('mirafive.enabled', false);
-
-    $this->artisan('mirafive:check')->expectsOutputToContain('disabled')->assertFailed();
-});
-
-it('sends directly in queue mode', function (): void {
-    config()->set('mirafive.queue', 'analytics');
-    $this->transport->queue(answer(202, ['batch' => 'b', 'accepted' => 0, 'dropped' => 1, 'reason' => 'install_check']));
-
-    $this->artisan('mirafive:check')->assertSuccessful();
-});
+    expect($this->transport->requests())->toBe([]);
+})->with([
+    'no key' => [['mirafive.secret_key' => null], 'No secret key'],
+    'public key' => [['mirafive.secret_key' => 'mira_pk_live_1'], 'holds a public key'],
+    'secret as public' => [['mirafive.public_key' => 'mira_sk_live_1'], 'MIRAFIVE_PUBLIC_KEY holds a secret key'],
+    'switched off' => [['mirafive.enabled' => false], 'switched off'],
+]);

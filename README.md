@@ -1,221 +1,287 @@
 # MIRA FIVE for Laravel
 
-Privacy-first analytics for Laravel, hosted in the EU: track business events from your controllers
-and jobs, and add the website tracker with one Blade directive. Events are sent after the
-response, so your pages never wait for analytics.
+[MIRA FIVE](https://mirafive.io) for Laravel 12 and 13: revenue attribution and analytics by Cloo
+GmbH, compliant with GDPR and TDDDG. One package for both sides of your app:
+
+- **Server events:** a `Mira` facade for events, revenue and touchpoints only your server knows.
+  They are sent after the response, so your users never wait for MIRA FIVE, or handed to a queue.
+- **The browser SDK:** `@mirafiveScript` prints the script tag with your public key and the consent
+  mode you choose.
+- **Tests:** `Mira::fake()` records instead of sending, with assertions.
+
+It builds on [`mirafive/sdk-php`](https://github.com/mirafive/sdk-php); everything documented
+there works here too. PHP 8.3 or newer.
 
 ## Install
 
-```bash
+```sh
 composer require mirafive/sdk-laravel
 ```
 
-PHP 8.3+, Laravel 11, 12 or 13. The service provider and the `Mira` facade are discovered automatically. To change
-the defaults, publish the configuration:
+The service provider and the `Mira` facade are discovered automatically. Add the project's keys
+(MIRA FIVE dashboard, Settings, Sources) to `.env`:
 
-```bash
-php artisan vendor:publish --tag=mirafive-config
+```dotenv
+MIRAFIVE_SECRET_KEY=mira_sk_…
+MIRAFIVE_PUBLIC_KEY=mira_pk_…
+```
+
+Then check them: the ingest answers whether the key works, and stores nothing.
+
+```sh
+php artisan mirafive:check
 ```
 
 ## Quickstart
 
-Create a **server source** and a **website source** in MIRA FIVE and put their keys in `.env`:
+**1. The browser SDK.** In your layout's `<head>`:
 
-```dotenv
-MIRAFIVE_SECRET_KEY=mf_ab12cd34_…    # server source, stays on the server
-MIRAFIVE_WEBSITE_KEY=mf_ef56gh78_…   # website source, public
+```blade
+@mirafiveScript
 ```
 
-Track from a controller:
+It follows your consent banner (CMP) by default and tracks page views, engagement, outbound
+clicks, downloads and form submits on its own. Options: `@mirafiveScript(['consent' => 'analytics'])`.
 
-```php
-use MiraFive\Laravel\Facades\Mira;
-
-public function store(Request $request)
-{
-    $user = User::create($request->validated());
-
-    Mira::track('signup', userId: (string) $user->id, properties: ['plan' => $user->plan]);
-
-    return redirect()->route('dashboard');
-}
-```
-
-For revenue, add `payment_id` (1–255 characters) to the properties next to `revenue` and `currency`: the payment provider's id of the payment. For Stripe pass the PaymentIntent id from a webhook: `Mira::track('order completed', properties: ['revenue' => 49, 'currency' => 'EUR', 'payment_id' => $paymentIntent->id]);`. MIRA FIVE merges the event with the payment it imports from your connected Stripe account, so the sale counts once.
-
-Identify after login, with the user's internal id and a few traits:
+**2. Who the user is.** For example in a listener for Laravel's `Login` event:
 
 ```php
 use Illuminate\Auth\Events\Login;
-use Illuminate\Support\Facades\Event;
 use MiraFive\Laravel\Facades\Mira;
 
-// AppServiceProvider::boot()
-Event::listen(Login::class, fn (Login $event) => Mira::forUser($event->user)->identify(['plan' => $event->user->plan]));
+Event::listen(function (Login $event): void {
+    Mira::identify(
+        userId: (string) $event->user->getAuthIdentifier(),
+        traits: ['email' => $event->user->email, 'plan' => $event->user->plan],
+        externalIds: ['stripe_customer' => $event->user->stripe_id], // links Stripe's money to this user
+    );
+});
 ```
 
-`Mira::forUser($request->user())` fills in `getAuthIdentifier()` as the user id for `track()` and `identify()`.
-
-Add the tracker to your layout's `<head>`:
-
-```blade
-<head>
-    @mirafiveScript
-</head>
-```
-
-It prints the hosted script with your website key, `data-mode="full"` when `MIRAFIVE_SCRIPT_MODE=full` (plus `data-host` when
-you use your own host), and a Vite CSP nonce when one is set. More tracker attributes go in as an array:
-
-```blade
-@mirafiveScript(['data-autocapture' => true, 'data-site-search' => 'q'])
-```
-
-Verify the setup:
-
-```bash
-php artisan mirafive:check
-```
-
-It sends a `$install_check` event (never stored or billed) and prints the receipt.
-
-## Consent & privacy
-
-MIRA FIVE has two collection modes, `full` and `consentless`, set separately for server events (`MIRAFIVE_MODE`,
-default `full`) and for the tracker (`MIRAFIVE_SCRIPT_MODE`, default `consentless`):
-
-- **`full`** may carry `userId`, `anonymousId` and `sessionId`. Server events assume your site already holds consent
-  or another lawful basis for the person they describe; the SDK cannot ask. A tracker in full mode stores nothing
-  until your consent banner grants it (`mirafive('consent', true)`).
-- **`consentless`** carries no identifiers at all and needs no banner, which is why it is the tracker's default. On
-  the server, passing an identifier throws an `InvalidArgumentException`, so a misconfiguration shows up on the first
-  call.
-
-Rules for both modes:
-
-- **Never send an email address as `userId`.** Use your internal id (`42`, a UUID). `forUser()` uses
-  `getAuthIdentifier()`, which is the primary key for Eloquent users.
-- **No personal data in event names or properties**: no names, emails, phone numbers or free text a person typed.
-- **The secret key never reaches a page.** `@mirafiveScript` prints only the website key.
-
-## Configuration
-
-| Key | Env | Default | |
-|---|---|---|---|
-| `enabled` | `MIRAFIVE_ENABLED` | `true` | Off, or without a secret key: nothing is sent and no key is needed. Off also omits the tracker tag |
-| `secret_key` | `MIRAFIVE_SECRET_KEY` | — | Secret key of a server source |
-| `website_key` | `MIRAFIVE_WEBSITE_KEY` | — | Public key of a website source, for `@mirafiveScript` |
-| `host` | `MIRAFIVE_HOST` | `https://collect.mirafive.io` | Collector, with scheme |
-| `mode` | `MIRAFIVE_MODE` | `full` | Server events: `full` or `consentless` |
-| `script_mode` | `MIRAFIVE_SCRIPT_MODE` | `consentless` | The tracker from `@mirafiveScript`: `consentless` or `full` |
-| `queue` | `MIRAFIVE_QUEUE` | `null` | `null` sends after the response; `mirafive` or `redis:mirafive` (connection:queue) dispatches a job per batch |
-| `script_url` | `MIRAFIVE_SCRIPT_URL` | `https://cdn.mirafive.io/mira.js` | Tracker script, e.g. a self-hosted copy |
-
-Delivery failures go to your default log channel as warnings. `MiraFive\Mira` can be
-injected directly; to send through your own HTTP client, bind `MiraFive\Http\Transport` (e.g. to
-`MiraFive\Http\Psr18Transport`) before it is resolved. The default cache store holds the delivery pause of the core
-client, so it applies to every PHP process during an outage.
-
-## Queues & Octane
-
-**When events are sent.** `track()` and `identify()` buffer. The buffer is sent once, when Laravel terminates (after
-the response under PHP-FPM), after each Octane request, task and tick, and after each queued job; the core's own
-shutdown flush is switched off. Every 100 events it is sent early. `send()` is always immediate.
-
-**Queued delivery.** With `MIRAFIVE_QUEUE` set, each buffered batch is encoded once and handed to a
-`MiraFive\Laravel\Queue\SendBatch` job, so the request does not wait for MIRA FIVE at all. The job carries the body,
-never the key: the worker sends it with its own configuration. The body is final and keeps its batch id, so a job
-that runs twice is stored once. Retryable failures are retried by the queue (5 tries, backoff up to 15 minutes);
-refused batches are logged and dropped. A worker without
-`MIRAFIVE_SECRET_KEY` logs an error and fails the job instead of dropping it; one with `MIRAFIVE_ENABLED=false` drops it
-quietly. Batches are up to 1 MiB of JSON (SQS allows 256 KB). `send()` never queues:
-it always sends immediately and returns the collector's receipt.
-
-**Octane.** The package is safe in long-running workers: no request state is kept in singletons, and the buffer is
-flushed at the end of every request. It adds `MiraFive\Mira`, the transport and the facade's client to
-`octane.warm`, so a worker keeps one HTTP connection instead of building it per request.
-
-## Testing with `Mira::fake()`
+**3. What only your server knows.** Anywhere in a request, job or command:
 
 ```php
 use MiraFive\Laravel\Facades\Mira;
 
-it('tracks the signup', function () {
-    $mira = Mira::fake();
+Mira::forUser($request->user())->track(event: 'report_exported', properties: ['format' => 'csv']);
 
-    $this->post('/register', [...])->assertRedirect();
+// Money, in integer minor units: 4900 is 49.00 EUR.
+Mira::revenue(
+    amount: $invoice->total,
+    currency: $invoice->currency,
+    userId: (string) $invoice->user_id,
+    entryId: 'stripe:'.$invoice->stripe_id,                    // the Stripe connector's copy counts once
+    eventId: Mira::eventIdFor('invoice:'.$invoice->id.':paid'), // a retried webhook counts once
+);
+```
 
-    $mira->assertTracked('signup');
-    $mira->assertTracked('signup', fn (array $event) => $event['properties']['plan'] === 'pro');
-    $mira->assertTracked('signup', 1);                 // exactly once
-    $mira->assertNotTracked('refund');
-    $mira->assertIdentified((string) $user->id);
-});
+Events wait in memory and leave after the response was sent. Nothing else to set up.
 
-it('stays quiet', function () {
-    Mira::fake()->assertNothingTracked();              // nothing tracked, sent or identified
+## Configuration
+
+Everything has an environment variable; publish the file only to change the script defaults:
+
+```sh
+php artisan vendor:publish --tag=mirafive-config
+```
+
+| Variable                     | Default                      | Meaning                                                                                                                     |
+| ---------------------------- | ---------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| `MIRAFIVE_SECRET_KEY`        | (none)                       | The project's secret key, `mira_sk_…`, for server events and revenue. Never in a page                                       |
+| `MIRAFIVE_PUBLIC_KEY`        | (none)                       | The project's public key, `mira_pk_…`, printed by `@mirafiveScript`                                                         |
+| `MIRAFIVE_HOST`              | `https://events.mirafive.io` | The ingest origin, for a self-hosted or local MIRA FIVE                                                                     |
+| `MIRAFIVE_ENABLED`           | `true`                       | `false`: nothing leaves the app and `@mirafiveScript` prints nothing; input is still checked                                |
+| `MIRAFIVE_QUEUE`             | (none)                       | A queue (`mirafive`) or `connection:queue` (`redis:mirafive`): batches go to a job instead of being sent after the response |
+| `MIRAFIVE_SCRIPT_URL`        | the MIRA FIVE CDN            | Where the browser SDK loads from; for another host, `{host}/sdk/mira.js`                                                    |
+| `MIRAFIVE_CONSENT`           | `auto`                       | The script's consent mode: `auto` (follow the CMP), `granted`, `denied`, `analytics` (analytics yes, marketing no)          |
+| `MIRAFIVE_TIMEOUT_MS`        | `3000`                       | Per request to the ingest                                                                                                   |
+| `MIRAFIVE_FLUSH_DEADLINE_MS` | `3000`                       | What one flush may spend on attempts and waits together                                                                     |
+| `MIRAFIVE_MAX_RETRIES`       | `2`                          | Retries per batch on network errors, timeouts, 408, 429 and 5xx                                                             |
+
+`config/mirafive.php` also has `script.autocapture`: `true`, `false`, or parts to turn off, such
+as `['forms' => false, 'outbound' => false]`.
+
+Without a secret key nothing is sent and nothing is logged, which keeps local development quiet;
+`php artisan mirafive:check` tells you why.
+
+## API
+
+`MiraFive\Laravel\Facades\Mira` is the container's `MiraFive\Mira`; inject `MiraFive\Mira` if you
+prefer. All methods take named arguments and never throw: problems are logged as warnings through
+Laravel's logger.
+
+| Method                                                                                              | What it sends                                                                                                                                       |
+| --------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `Mira::track(event, userId, anonymousId, properties, …)`                                            | A custom event. Names starting with `$` are reserved                                                                                                |
+| `Mira::identify(userId, traits, externalIds, …)`                                                    | Who the user is. PII traits are encrypted at rest. `externalIds`: `stripe_customer`, `revenuecat_app_user`, `shopify_customer`, `shopware_customer` |
+| `Mira::group(groupId, userId, traits, …)`                                                           | The company or account a user belongs to                                                                                                            |
+| `Mira::revenue(amount, currency, entryId, entryKind, fee, tax, refundOf, product, subscription, …)` | One revenue ledger entry, in integer minor units                                                                                                    |
+| `Mira::touchpoint(kind, userId, channel, source, medium, campaign, answer, code, …)`                | A touchpoint that is not a visit: a survey answer, an offline contact, a code                                                                       |
+| `Mira::forUser($user)`                                                                              | A client that sends as this user (`getAuthIdentifier()`)                                                                                            |
+| `Mira::forRequest($request)`                                                                        | A client that sends the request's IP (for geo, never stored) and user agent with every event                                                        |
+| `Mira::with(userId, anonymousId, consent, context)`                                                 | A client with these defaults; the call's own values win                                                                                             |
+| `Mira::eventIdFor('order:123:paid')`                                                                | A stable event id from your own key, identical in every MIRA FIVE SDK                                                                               |
+| `Mira::flush()`                                                                                     | Sends now (also happens after the response, each job and each Octane request)                                                                       |
+
+Every event method also takes `eventId`, `timestamp` (a date, epoch milliseconds or ISO string;
+past dates are fine for backfills), `consent` and `context` (`ip`, `userAgent`, `page`, `app`,
+`locale`, `timezone`, `location`). The [sdk-php README](https://github.com/mirafive/sdk-php#api-reference)
+documents every argument.
+
+### Revenue
+
+```php
+// A subscription payment (the first one and every renewal), with store commission and VAT.
+Mira::revenue(
+    amount: 999,
+    currency: 'EUR',
+    userId: 'user_42',
+    entryId: 'revenuecat:txn_1000000123',
+    fee: 150,
+    tax: 160,
+    product: 'premium_monthly',
+    subscription: ['id' => 'sub_42', 'interval' => 'month'], // or intervalCount, periodStart, periodEnd
+);
+
+// A refund takes the money back, and the credit of the channels that earned it.
+Mira::revenue(
+    amount: -999,
+    currency: 'EUR',
+    userId: 'user_42',
+    entryKind: 'refund',
+    entryId: 'revenuecat:txn_1000000123:refund',
+    refundOf: 'revenuecat:txn_1000000123',
+);
+```
+
+`entryKind` is `charge` (the default), `subscription_payment` (the default with `subscription`),
+`refund` (the default for a negative amount), `dispute` or `dispute_won`. Proceeds are the amount
+minus `fee` and `tax`. `19.99` is refused: send `1999`.
+
+### Touchpoints
+
+```php
+// "How did you hear about us?" on your sign-up form.
+Mira::touchpoint(
+    kind: 'survey',
+    userId: (string) $user->id,
+    source: $request->string('heard_from')->value(),     // podcast, instagram, a friend, …
+    answer: $request->string('heard_from_text')->value(), // passes MIRA's PII guard
+    eventId: Mira::eventIdFor('survey:'.$user->id),
+);
+
+// A redeemed partner code.
+Mira::touchpoint(kind: 'code', userId: (string) $user->id, channel: 'affiliate', source: 'partner_x', code: 'PARTNER20');
+```
+
+A touchpoint needs a user or anonymous id and a `channel` or a `source`. Kinds: `survey`,
+`offline`, `code`, `custom`.
+
+## Consent tiers
+
+Server events default to `not_applicable`: a paid invoice is a fact of your business. For events
+that describe what a visitor did, pass what your consent banner recorded:
+
+```php
+Mira::forUser($user)->track(event: 'search', consent: ['analytics' => true, 'marketing' => false]);
+// or MiraFive\Consent::granted(), Consent::analyticsOnly(), Consent::denied()
+```
+
+| `consent` on the event                           | Tier    | What MIRA keeps                                                                               |
+| ------------------------------------------------ | ------- | --------------------------------------------------------------------------------------------- |
+| `not_applicable` (default), no `userId`          | T1      | The event, `anonymous_id` if given, geo from `context.ip` (the IP is discarded)               |
+| `not_applicable` with `userId`                   | T2      | Plus `user_id`, traits (PII traits encrypted at rest), revenue per person                     |
+| `{ analytics: 'granted' }`                       | T1 / T2 | As above                                                                                      |
+| `{ analytics: 'granted', marketing: 'granted' }` | T3      | Plus click ids, and later forwarding to ad platforms                                          |
+| `{ analytics: 'denied' \| 'unknown' }`           | T0      | No `user_id`, `anonymous_id` or `session_id`: the event counts, but is not linked to a person |
+
+The browser SDK printed by `@mirafiveScript` follows your consent banner itself (`consent: auto`).
+
+## The script tag
+
+```blade
+@mirafiveScript
+@mirafiveScript(['consent' => 'analytics', 'autocapture' => ['forms' => false]])
+```
+
+| Option        | Default                    | Meaning                                                                                                 |
+| ------------- | -------------------------- | ------------------------------------------------------------------------------------------------------- |
+| `consent`     | `MIRAFIVE_CONSENT`, `auto` | `auto` follows the CMP; `granted`, `denied`, or `analytics` (analytics yes, marketing no)               |
+| `autocapture` | `true`                     | `false` turns off all automatic events; or parts: `spa`, `engagement`, `outbound`, `downloads`, `forms` |
+| `src`, `host` | from the config            | Where the SDK loads from and where it sends                                                             |
+| `debug`       | `false`                    | Logs what the SDK does to the browser console                                                           |
+| `nonce`       | Vite's CSP nonce           | A Content Security Policy nonce for both tags                                                           |
+
+It prints the tag the MIRA FIVE dashboard shows: a stub that queues `mira(…)` calls made before the
+SDK has loaded, then the SDK. Nothing is printed when `MIRAFIVE_ENABLED=false` or without a public
+key. A secret key is never printed: the tag becomes an HTML comment and the problem is logged.
+
+## Queues and Octane
+
+By default batches are sent after the response (in `terminating`), so users never wait. To keep
+even that off your web servers, hand the batches to a queue:
+
+```dotenv
+MIRAFIVE_QUEUE=redis:mirafive
+```
+
+Each batch becomes a `MiraFive\Laravel\Queue\SendBatch` job. The job carries no key: the worker
+sends with its own `MIRAFIVE_SECRET_KEY`, so set it on workers too. A failed delivery is retried by
+the queue (5 tries, backing off 10 s, 1 min, 5 min, 15 min) with the same events and sequence
+number, so a job that runs twice is counted once. A batch the ingest refuses for good is logged and
+dropped; a worker without a key fails the job.
+
+Events tracked inside a job leave when the job is done. Under **Octane**, events leave after each
+request, task and tick, and the client is added to `octane.warm`, so its connection is reused.
+
+## Testing
+
+```php
+use MiraFive\Laravel\Facades\Mira;
+
+it('records the purchase', function () {
+    $fake = Mira::fake();
+
+    $this->post('/checkout', ['plan' => 'pro'])->assertOk();
+
+    $fake->assertTracked('checkout_completed');
+    $fake->assertRevenue(fn (array $event) => $event['revenue']['amount'] === 4900
+        && $event['revenue']['currency'] === 'EUR');
+    $fake->assertIdentified('42', fn (array $event) => $event['traits']['plan'] === 'pro');
+    $fake->assertNoErrors();
 });
 ```
 
-The fake records `track()`, `identify()` and `send()` through the facade and through an injected
-`MiraFive\Laravel\Client`. Input is still checked, so an event MIRA FIVE would refuse fails the test. Code that injects `MiraFive\Mira` directly is not faked; set `MIRAFIVE_ENABLED=false` in `phpunit.xml` so
-it sends nothing.
+`Mira::fake()` swaps in a real client on a recording transport: input is checked exactly as in
+production, so an event the ingest would refuse fails the test. Assertions: `assertTracked(name,
+callback|times)`, `assertNotTracked`, `assertIdentified`, `assertGrouped`, `assertRevenue`,
+`assertTouchpoint`, `assertNothingTracked`, `assertNoErrors`; plus `events(?name)`, `errors()` and
+`clear()`. Callbacks get the wire event with snake_case keys (`user_id`, `properties`, `revenue`,
+`traits`, `external_ids`).
 
 ## Troubleshooting
 
-- **Nothing arrives.** Run `php artisan mirafive:check`. Then look for `[mirafive]` warnings in your log.
-- **`unauthorized`.** `MIRAFIVE_SECRET_KEY` is missing, wrong or revoked; it must be the secret key of a *server*
-  source. After changing `.env` in production, run `php artisan config:cache` again.
-- **`website_key_as_bearer`.** The website key ended up in `MIRAFIVE_SECRET_KEY`. Server code needs the secret key.
-- **`InvalidArgumentException: A consentless client may not send userId`.** `MIRAFIVE_MODE` is `consentless`; drop the
-  identifiers or switch to `full` where you hold consent.
-- **No tracker tag.** `MIRAFIVE_WEBSITE_KEY` is empty or `MIRAFIVE_ENABLED` is false.
-- **Queued batches never arrive.** A worker must run the configured queue (`php artisan queue:work redis --queue=mirafive`).
+Start with `php artisan mirafive:check`: it shows the host, the keys and the delivery mode, and
+asks the ingest whether the key works; nothing is stored or counted.
 
-## For AI agents
+- **Nothing arrives, nothing is logged.** `MIRAFIVE_SECRET_KEY` is not set (or the config is
+  cached: `php artisan config:clear`).
+- **`batch dropped: HTTP 401 unknown_key`.** The key is wrong, revoked or from another host.
+- **`MIRAFIVE_SECRET_KEY holds a public key`.** Server code needs `mira_sk_…`; `mira_pk_…` is for
+  the script tag.
+- **`@mirafiveScript` prints an HTML comment.** `MIRAFIVE_PUBLIC_KEY` holds a secret key; the log
+  says so. Rotate that key if the page was ever served with it elsewhere.
+- **Queued batches never arrive.** Run a worker for the queue in `MIRAFIVE_QUEUE`, and set
+  `MIRAFIVE_SECRET_KEY` on it.
+- **`revenue: amount must be an integer in minor units`.** Send cents: `1999`, not `19.99`.
 
-A prompt for an agent adding MIRA FIVE to a Laravel application:
+## Development
 
-```text
-Add MIRA FIVE analytics to this Laravel application with the Composer package mirafive/sdk-laravel.
-
-1. Run `composer require mirafive/sdk-laravel` (PHP 8.3+, Laravel 11–13). The provider and the `Mira` facade are
-   auto-discovered; do not register them by hand.
-2. Add to .env.example (empty values) and ask me for the real values for .env:
-   MIRAFIVE_SECRET_KEY=   (secret key of a server source; never print it into HTML or JavaScript)
-   MIRAFIVE_WEBSITE_KEY=  (public key of a website source)
-   Only add MIRAFIVE_HOST, MIRAFIVE_MODE or MIRAFIVE_SCRIPT_MODE if I ask for them. The tracker is consentless by
-   default; set MIRAFIVE_SCRIPT_MODE=full only if the site has a consent banner that calls mirafive('consent', …).
-3. Put `@mirafiveScript` inside <head> of the main Blade layout(s), once per page.
-4. Track the signup where the user is created:
-   `\MiraFive\Laravel\Facades\Mira::track('signup', userId: (string) $user->getAuthIdentifier(), properties: ['plan' => $plan]);`
-   Use the internal user id, never an email address. No personal data in event names or properties.
-   Identify on login: listen to Illuminate\Auth\Events\Login and call
-   `Mira::forUser($event->user)->identify(['plan' => ...]);`
-5. Do not call flush(); the package sends after the response, after Octane requests and after queued jobs.
-6. In tests, call `$mira = Mira::fake();` and assert with `$mira->assertTracked('signup')`.
-   Set <env name="MIRAFIVE_ENABLED" value="false"/> in phpunit.xml.
-7. Verify with `php artisan mirafive:check`: it must end with "The key and host work". Report the output.
+```sh
+composer install
+composer check   # pint --test, phpstan (max, strict, Larastan), pest
 ```
-
-Facts for agents:
-
-- Package `mirafive/sdk-laravel`, namespace `MiraFive\Laravel`, facade `MiraFive\Laravel\Facades\Mira` (alias `Mira`),
-  wrapping `mirafive/sdk-php` (`MiraFive\Mira`, a container singleton).
-- Env: `MIRAFIVE_SECRET_KEY`, `MIRAFIVE_WEBSITE_KEY`, `MIRAFIVE_HOST`, `MIRAFIVE_MODE` (server, default `full`), `MIRAFIVE_SCRIPT_MODE` (tracker, default `consentless`),
-  `MIRAFIVE_QUEUE`, `MIRAFIVE_ENABLED`, `MIRAFIVE_SCRIPT_URL`.
-  Config file `config/mirafive.php`, publish tag `mirafive-config`.
-- Facade: `track(name, userId:, anonymousId:, sessionId:, properties:, time:, page:)`, `identify(userId, traits)`,
-  `send(events, idempotencyKey:)` (immediate, returns `MiraFive\Receipt`, throws `MiraFive\MiraError`), `flush()`,
-  `forUser($user)`, `optedOut($request)`, `fake()`.
-- Buffered events are flushed on terminate, Octane `RequestTerminated`, and after each queued job. Never call
-  `flush()` in normal code.
-- Blade: `@mirafiveScript` / `@mirafiveScript([...data attributes])`.
-- Without a secret key, or with `MIRAFIVE_ENABLED=false`, nothing is sent and no key is needed; invalid events still throw.
-- With `MIRAFIVE_QUEUE`, buffered batches go to `SendBatch` jobs; `send()` is always synchronous.
-- `php artisan mirafive:check` proves key and host; success is a receipt with reason `install_check`.
-- `userId` is the internal id, never an email. The secret key never goes to a browser.
 
 ## License
 
-MIT, see [LICENSE](LICENSE). Copyright (c) 2026 Cloo GmbH.
+MIT, Cloo GmbH. See [LICENSE](LICENSE).
