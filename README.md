@@ -115,7 +115,7 @@ Laravel's logger.
 | `Mira::track(event, userId, anonymousId, properties, …)`                                            | A custom event. Names starting with `$` are reserved                                                                                                |
 | `Mira::identify(userId, traits, externalIds, …)`                                                    | Who the user is. PII traits are encrypted at rest. `externalIds`: `stripe_customer`, `revenuecat_app_user`, `shopify_customer`, `shopware_customer` |
 | `Mira::group(groupId, userId, traits, …)`                                                           | The company or account a user belongs to                                                                                                            |
-| `Mira::revenue(amount, currency, entryId, entryKind, fee, tax, refundOf, product, subscription, …)` | One revenue ledger entry, in integer minor units                                                                                                    |
+| `Mira::revenue(amount, currency, entryId, entryKind, refundOf, product, subscription, …)`           | One revenue ledger entry, in integer minor units                                                                                                    |
 | `Mira::touchpoint(kind, userId, channel, source, medium, campaign, answer, code, …)`                | A touchpoint that is not a visit: a survey answer, an offline contact, a code                                                                       |
 | `Mira::forUser($user)`                                                                              | A client that sends as this user (`getAuthIdentifier()`)                                                                                            |
 | `Mira::forRequest($request)`                                                                        | A client that sends the request's IP (for geo, never stored) and user agent with every event                                                        |
@@ -131,14 +131,12 @@ documents every argument.
 ### Revenue
 
 ```php
-// A subscription payment (the first one and every renewal), with store commission and VAT.
+// A subscription payment (the first one and every renewal).
 Mira::revenue(
     amount: 999,
     currency: 'EUR',
     userId: 'user_42',
     entryId: 'revenuecat:txn_1000000123',
-    fee: 150,
-    tax: 160,
     product: 'premium_monthly',
     subscription: ['id' => 'sub_42', 'interval' => 'month'], // or intervalCount, periodStart, periodEnd
 );
@@ -155,8 +153,8 @@ Mira::revenue(
 ```
 
 `entryKind` is `charge` (the default), `subscription_payment` (the default with `subscription`),
-`refund` (the default for a negative amount), `dispute` or `dispute_won`. Proceeds are the amount
-minus `fee` and `tax`. `19.99` is refused: send `1999`.
+`refund` (the default for a negative amount), `dispute` or `dispute_won`. `amount` is what the
+customer paid, VAT included. `19.99` is refused: send `1999`.
 
 ### Touchpoints
 
