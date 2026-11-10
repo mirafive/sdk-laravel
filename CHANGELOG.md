@@ -1,5 +1,17 @@
 # Changelog
 
+## 2.2.0 — 2026-11-10
+
+### Added
+
+- `Mira::deletePerson($userId)`: erases one person (GDPR Art. 17) with the secret key and returns
+  the proof. Synchronous, throws a `MiraError` with `retryable`; idempotent. `Mira::fake()`
+  answers it with an empty proof.
+
+### Changed
+
+- Requires [`mirafive/sdk-php`](https://github.com/mirafive/sdk-php) 2.2.1.
+
 ## 2.1.0 — 2026-11-09
 
 ### Changed
