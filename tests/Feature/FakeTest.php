@@ -35,3 +35,14 @@ it('fails a test on input the ingest would refuse', function (): void {
     $fake->assertNothingTracked();
     expect($fake->errors()[0]->getMessage())->toBe('revenue: amount must be an integer in minor units (1999 for 19.99)');
 });
+
+it('erases a person through the facade, synchronously, and records the request', function (): void {
+    $fake = Mira::fake();
+
+    $proof = Mira::deletePerson('cust 1');
+    $request = $fake->transport->requests()[0];
+
+    expect($proof->deleted)->toBe(['events' => 0])
+        ->and($request['method'])->toBe('DELETE')
+        ->and($request['url'])->toEndWith('/v1/persons/cust%201');
+});

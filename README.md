@@ -232,6 +232,36 @@ dropped; a worker without a key fails the job.
 Events tracked inside a job leave when the job is done. Under **Octane**, events leave after each
 request, task and tick, and the client is added to `octane.warm`, so its connection is reused.
 
+## Erasing a person (GDPR Art. 17)
+
+```php
+$proof = Mira::deletePerson((string) $customer->id);
+$proof->requestId; // the deletion request, listed in the project's privacy log
+$proof->deleted;   // rows deleted per table
+```
+
+It erases the person with the same effect as the dashboard's People page: events, devices, traits,
+ids in other systems and touchpoints. Revenue stays in the totals, without the person. Unlike the
+event methods it runs now, not after the response, and throws a `MiraFive\MiraError`. Put it in a
+queued job and let the queue retry what can succeed later:
+
+```php
+public function handle(): void
+{
+    try {
+        Mira::deletePerson($this->customerId);
+    } catch (MiraError $error) {
+        $error->retryable ? $this->release(60) : $this->fail($error);
+    }
+}
+```
+
+`retryable` is true for a busy or unreachable ingest and false for a wrong key or a bad id. The
+erasure is idempotent: an unknown or already erased person returns zero rows, so a retry is always
+safe. Events that name the person afterwards are refused for 30 days: stop sending them. See
+[`deletePerson`](https://github.com/mirafive/sdk-php#deletepersonstring-userid-personerasure) in the
+sdk-php README. In tests, `Mira::fake()` answers it with an empty proof.
+
 ## Testing
 
 ```php

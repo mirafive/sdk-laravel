@@ -26,6 +26,7 @@ use MiraFive\Testing\MiraFake;
  * @method static void flush()
  * @method static \MiraFive\BatchResult deliverPrepared(string $payload)
  * @method static void checkConnection()
+ * @method static \MiraFive\PersonErasure deletePerson(string $userId)
  *
  * @see Client
  */
